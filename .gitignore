@@ -46,5 +46,5 @@ TrafficAIPro/database/*.sqlite3
 test_images/
 *.log
 
-# Keep model file
-!best_oto.pt
+# Keep bundled model weights when present
+!TrafficAIPro/models/weights/best_oto.pt

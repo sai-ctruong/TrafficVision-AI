@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PyQt6.QtCore import QSettings
 from qfluentwidgets import Theme
 
@@ -25,7 +27,8 @@ class SettingsService:
 
     @property
     def model_path(self) -> str:
-        return self._settings.value("model_path", str(DEFAULT_MODEL_PATH), str)
+        value = self._settings.value("model_path", str(DEFAULT_MODEL_PATH), str)
+        return value if Path(value).exists() else str(DEFAULT_MODEL_PATH)
 
     @model_path.setter
     def model_path(self, value: str) -> None:

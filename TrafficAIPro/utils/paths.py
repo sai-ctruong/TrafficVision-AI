@@ -9,7 +9,8 @@ APP_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = APP_ROOT.parent
 DATA_DIR = APP_ROOT / "database"
 EXPORT_DIR = APP_ROOT / "exports"
-DEFAULT_MODEL_PATH = WORKSPACE_ROOT / "best_oto.pt"
+WEIGHTS_DIR = APP_ROOT / "models" / "weights"
+DEFAULT_MODEL_PATH = WEIGHTS_DIR / "best_oto.pt"
 DB_PATH = DATA_DIR / "trafficai_history.sqlite3"
 
 
@@ -17,4 +18,5 @@ def ensure_app_dirs() -> None:
     """Create runtime directories used by the app."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
