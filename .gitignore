@@ -41,6 +41,8 @@ Thumbs.db
 # Project specific
 output/
 exports/
+TrafficAIPro/exports/
+TrafficAIPro/database/*.sqlite3
 test_images/
 *.log
 
