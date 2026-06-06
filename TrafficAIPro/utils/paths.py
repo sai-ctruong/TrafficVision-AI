@@ -10,7 +10,7 @@ WORKSPACE_ROOT = APP_ROOT.parent
 DATA_DIR = APP_ROOT / "database"
 EXPORT_DIR = APP_ROOT / "exports"
 WEIGHTS_DIR = APP_ROOT / "models" / "weights"
-DEFAULT_MODEL_PATH = WEIGHTS_DIR / "best_oto.pt"
+DEFAULT_MODEL_PATH = WEIGHTS_DIR / "Car_YOLO26_Best.pt"
 DB_PATH = DATA_DIR / "trafficai_history.sqlite3"
 
 
