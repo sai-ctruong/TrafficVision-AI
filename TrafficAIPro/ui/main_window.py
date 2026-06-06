@@ -150,10 +150,36 @@ class TrafficAIWindow(QMainWindow):
         """Update UI after detection completes."""
         self.dashboard.update_summary(summary, self.detection_service.model_name)
         self.analytics.add_summary(summary)
+        self._update_enhancement_analytics(summary)
         self.history.refresh()
         
         # Update header status
         self.header.set_status(self.detection_service.model_name, "loaded")
+
+    def _update_enhancement_analytics(self, enhanced_summary) -> None:
+        """Update original vs enhanced analytics without storing duplicate history."""
+        original_image = self.processing.original_image
+        enhanced_image = self.processing.enhanced_image
+        if enhanced_image is None:
+            enhanced_image = self.detection.current_image
+        original_summary = None
+
+        if original_image is not None and self.detection_service.is_loaded:
+            try:
+                _, original_summary = self.detection_service.detect(
+                    original_image,
+                    f"Original {enhanced_summary.image_name}",
+                    self.settings_service.confidence,
+                )
+            except Exception:
+                original_summary = None
+
+        self.analytics.update_enhancement_comparison(
+            original_image,
+            enhanced_image,
+            original_summary,
+            enhanced_summary,
+        )
 
     def _update_model_status(self, message: str) -> None:
         """Update model status in header."""
