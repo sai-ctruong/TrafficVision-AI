@@ -1,16 +1,97 @@
-"""Application header with primary workflow actions and model status."""
+"""Professional application header with workflow actions and model status."""
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
-from qfluentwidgets import BodyLabel, FluentIcon, IconWidget, PrimaryPushButton, PushButton, StrongBodyLabel
+from qfluentwidgets import BodyLabel, FluentIcon, IconWidget, IndeterminateProgressRing, PrimaryPushButton, PushButton, StrongBodyLabel
 
-from ..utils.theme import CARD_BACKGROUND, CARD_BORDER, ERROR, PRIMARY, SECONDARY_TEXT, SUCCESS, WARNING
+from ..utils.theme import CARD_BORDER, ERROR, PRIMARY, SECONDARY_TEXT, SUCCESS, WARNING
+
+
+class ModelStatusPill(QWidget):
+    """Modern status indicator pill with colored dot, text, and loading animation."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("StatusPill")
+        self.setStyleSheet(
+            f"""
+            #StatusPill {{
+                background: rgba(255, 255, 255, 0.95);
+                border: 1px solid {CARD_BORDER};
+                border-radius: 20px;
+                padding: 8px 16px;
+            }}
+            """
+        )
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(10)
+
+        # Status dot
+        self.dot = QLabel()
+        self.dot.setFixedSize(10, 10)
+        self.dot.setStyleSheet(
+            f"""
+            background: {ERROR};
+            border-radius: 5px;
+            """
+        )
+        layout.addWidget(self.dot)
+
+        # Loading spinner (hidden by default)
+        self.spinner = IndeterminateProgressRing(self)
+        self.spinner.setFixedSize(16, 16)
+        self.spinner.setStrokeWidth(2)
+        self.spinner.hide()
+        layout.addWidget(self.spinner)
+
+        # Status text
+        self.label = BodyLabel("Model Not Loaded")
+        self.label.setStyleSheet(
+            f"""
+            font-size: 13px;
+            font-weight: 600;
+            color: {SECONDARY_TEXT};
+            """
+        )
+        layout.addWidget(self.label)
+
+    def set_status(self, text: str, state: str) -> None:
+        """Update status pill appearance."""
+        color_map = {
+            "loaded": SUCCESS,
+            "loading": WARNING,
+            "processing": WARNING,
+            "error": ERROR,
+            "not_loaded": ERROR,
+        }
+        color = color_map.get(state, ERROR)
+        
+        # Update dot color
+        self.dot.setStyleSheet(
+            f"""
+            background: {color};
+            border-radius: 5px;
+            """
+        )
+        
+        # Show/hide spinner for loading states
+        if state in ["loading", "processing"]:
+            self.dot.hide()
+            self.spinner.show()
+        else:
+            self.spinner.hide()
+            self.dot.show()
+        
+        # Update text
+        self.label.setText(text)
 
 
 class AppHeader(QFrame):
-    """Top product header for the TrafficAI Pro shell."""
+    """72px professional header with branding and actions."""
 
     load_model_requested = pyqtSignal()
     upload_image_requested = pyqtSignal()
@@ -19,80 +100,89 @@ class AppHeader(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("AppHeader")
-        self.setFixedHeight(92)
+        self.setFixedHeight(72)
         self.setStyleSheet(
             f"""
             #AppHeader {{
-                background: {CARD_BACKGROUND};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #FFFFFF, stop:0.5 #FAFBFD, stop:1 #F8FAFC);
                 border-bottom: 1px solid {CARD_BORDER};
-            }}
-            QLabel#StatusDot {{
-                border-radius: 5px;
-                background: {ERROR};
             }}
             """
         )
 
         root = QHBoxLayout(self)
-        root.setContentsMargins(28, 14, 28, 14)
-        root.setSpacing(18)
+        root.setContentsMargins(32, 16, 32, 16)
+        root.setSpacing(24)
 
-        logo = QWidget()
-        logo.setFixedSize(48, 48)
-        logo.setStyleSheet(f"background: #EAF3FF; border-radius: 14px;")
-        logo_layout = QHBoxLayout(logo)
-        logo_layout.setContentsMargins(0, 0, 0, 0)
-        logo_icon = IconWidget(FluentIcon.CAR)
-        logo_icon.setFixedSize(28, 28)
-        logo_layout.addWidget(logo_icon, 0, Qt.AlignmentFlag.AlignCenter)
-        root.addWidget(logo)
+        # Left: Branding
+        brand_container = QWidget()
+        brand_layout = QVBoxLayout(brand_container)
+        brand_layout.setContentsMargins(0, 0, 0, 0)
+        brand_layout.setSpacing(2)
 
-        title_box = QVBoxLayout()
-        title_box.setSpacing(2)
         title = StrongBodyLabel("TrafficAI Pro")
-        title.setStyleSheet("font-size: 22px; font-weight: 700;")
-        subtitle = BodyLabel("Smart Traffic Vehicle Detection & Analytics System")
-        subtitle.setStyleSheet(f"font-size: 13px; color: {SECONDARY_TEXT};")
-        title_box.addWidget(title)
-        title_box.addWidget(subtitle)
-        root.addLayout(title_box, 1)
+        title.setStyleSheet(
+            """
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -0.4px;
+            """
+        )
+        brand_layout.addWidget(title)
 
-        self.load_button = PushButton(FluentIcon.ROBOT, "Load Model")
-        self.upload_button = PushButton(FluentIcon.PHOTO, "Upload Image")
-        self.run_button = PrimaryPushButton(FluentIcon.PLAY, "Run Detection")
+        subtitle = BodyLabel("Smart Traffic Vehicle Detection & Analytics System")
+        subtitle.setStyleSheet(
+            f"""
+            font-size: 12px;
+            color: {SECONDARY_TEXT};
+            font-weight: 500;
+            """
+        )
+        brand_layout.addWidget(subtitle)
+
+        root.addWidget(brand_container)
+        root.addStretch(1)
+
+        # Right: Action buttons + status
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(12)
+
+        self.load_button = PushButton("Load Model")
+        self.load_button.setIcon(FluentIcon.ROBOT)
+        
+        self.upload_button = PushButton("Upload Image")
+        self.upload_button.setIcon(FluentIcon.PHOTO)
+        
+        self.run_button = PrimaryPushButton("Run Detection")
+        self.run_button.setIcon(FluentIcon.PLAY)
+
+        # Set button sizes
+        for btn in [self.load_button, self.upload_button, self.run_button]:
+            btn.setFixedHeight(40)
+            btn.setMinimumWidth(120)
+
         self.load_button.clicked.connect(self.load_model_requested)
         self.upload_button.clicked.connect(self.upload_image_requested)
         self.run_button.clicked.connect(self.run_detection_requested)
-        root.addWidget(self.load_button)
-        root.addWidget(self.upload_button)
-        root.addWidget(self.run_button)
 
-        status_box = QWidget()
-        status_box.setObjectName("HeaderStatus")
-        status_box.setStyleSheet(
-            f"""
-            #HeaderStatus {{
-                background: #F8FAFC;
-                border: 1px solid {CARD_BORDER};
-                border-radius: 18px;
-            }}
-            """
-        )
-        status_layout = QHBoxLayout(status_box)
-        status_layout.setContentsMargins(14, 7, 14, 7)
-        status_layout.setSpacing(8)
-        self.status_label = BodyLabel("Model: Not Loaded")
-        self.status_label.setStyleSheet(f"color: {SECONDARY_TEXT}; font-weight: 600;")
-        self.status_dot = QLabel()
-        self.status_dot.setObjectName("StatusDot")
-        self.status_dot.setFixedSize(10, 10)
-        status_layout.addWidget(self.status_label)
-        status_layout.addWidget(self.status_dot)
-        root.addWidget(status_box)
+        actions_layout.addWidget(self.load_button)
+        actions_layout.addWidget(self.upload_button)
+        actions_layout.addWidget(self.run_button)
+
+        # Separator
+        separator = QWidget()
+        separator.setFixedSize(1, 40)
+        separator.setStyleSheet(f"background: {CARD_BORDER};")
+        actions_layout.addWidget(separator)
+
+        # Status pill
+        self.status_pill = ModelStatusPill()
+        actions_layout.addWidget(self.status_pill)
+
+        root.addLayout(actions_layout)
 
     def set_status(self, text: str, state: str) -> None:
-        """Set model status chip state."""
-        color = {"loaded": SUCCESS, "processing": WARNING, "error": ERROR}.get(state, ERROR)
-        self.status_label.setText(text)
-        self.status_dot.setStyleSheet(f"border-radius: 5px; background: {color};")
-
+        """Update model status pill."""
+        self.status_pill.set_status(text, state)

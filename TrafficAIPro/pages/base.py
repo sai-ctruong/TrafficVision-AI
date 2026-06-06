@@ -11,7 +11,7 @@ from qfluentwidgets import ScrollArea, TitleLabel
 
 
 class BackgroundView(QWidget):
-    """Page body with a soft traffic image behind the content."""
+    """Page body with traffic city background and soft overlay."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -19,18 +19,27 @@ class BackgroundView(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         backgrounds_dir = Path(__file__).resolve().parents[1] / "assets" / "backgrounds"
-        background_path = backgrounds_dir / "background_traffic_blur.jpg"
+        # Use the less blurred version
+        background_path = backgrounds_dir / "background_traffic.jpg"
         if not background_path.exists():
-            background_path = backgrounds_dir / "background_traffic.jpg"
+            background_path = backgrounds_dir / "background_traffic_blur.jpg"
 
         self._background_pixmap = QPixmap(str(background_path))
         self.background = QLabel(self)
         self.background.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.background.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
+        # Softer overlay for readability
         self.overlay = QLabel(self)
         self.overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.overlay.setStyleSheet("background: rgba(243, 246, 250, 135);")
+        self.overlay.setStyleSheet(
+            """
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(248, 250, 252, 0.88),
+                stop:0.5 rgba(243, 246, 250, 0.85),
+                stop:1 rgba(238, 242, 248, 0.90));
+            """
+        )
         self.background.lower()
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
@@ -54,7 +63,7 @@ class BackgroundView(QWidget):
 
 
 class Page(ScrollArea):
-    """Scrollable page with a title and content body."""
+    """Scrollable page with content body and traffic background."""
 
     def __init__(self, title: str, object_name: str) -> None:
         super().__init__()
@@ -65,7 +74,18 @@ class Page(ScrollArea):
         self.view = BackgroundView()
         self.setWidget(self.view)
         self.layout = QVBoxLayout(self.view)
-        self.layout.setContentsMargins(28, 24, 28, 28)
-        self.layout.setSpacing(18)
-        self.layout.addWidget(TitleLabel(title))
+        self.layout.setContentsMargins(32, 28, 32, 32)
+        self.layout.setSpacing(20)
+        
+        # Modern page title
+        page_title = TitleLabel(title)
+        page_title.setStyleSheet(
+            """
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -0.5px;
+            """
+        )
+        self.layout.addWidget(page_title)
 

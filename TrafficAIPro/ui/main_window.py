@@ -1,9 +1,10 @@
-"""Main Fluent window."""
+"""Main application window with custom header and sidebar."""
 
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize
-from qfluentwidgets import BodyLabel, FluentIcon, FluentWindow, NavigationItemPosition, Theme, setTheme
+from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
+from qfluentwidgets import Theme, setTheme
 
 from ..database.history_repository import HistoryRepository
 from ..pages.analytics import AnalyticsPage
@@ -15,23 +16,53 @@ from ..pages.settings import SettingsPage
 from ..services.detection_service import VehicleDetectionService
 from ..services.image_service import ImageEnhancementService
 from ..services.settings_service import SettingsService
+from ..widgets.app_header import AppHeader
+from ..widgets.sidebar import Sidebar
 
 
-class TrafficAIWindow(FluentWindow):
-    """Production-style shell for TrafficAI Pro."""
+class TrafficAIWindow(QMainWindow):
+    """Commercial-grade TrafficAI Pro window with custom layout."""
 
     def __init__(self) -> None:
+        super().__init__()
+        
+        # Services
         self.settings_service = SettingsService()
         setTheme(self.settings_service.theme)
-        super().__init__()
-        self.setWindowTitle("TrafficAI Pro - Smart Traffic Vehicle Detection & Analytics System")
-        self.resize(1480, 900)
-        self.setMinimumSize(QSize(1180, 760))
-
         self.image_service = ImageEnhancementService()
         self.detection_service = VehicleDetectionService(self.settings_service.model_path)
         self.history_repository = HistoryRepository()
 
+        # Window setup
+        self.setWindowTitle("TrafficAI Pro")
+        self.resize(1520, 920)
+        self.setMinimumSize(QSize(1280, 800))
+        
+        # Main container
+        container = QWidget()
+        self.setCentralWidget(container)
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Header
+        self.header = AppHeader()
+        main_layout.addWidget(self.header)
+
+        # Content area: sidebar + pages
+        content_layout = QHBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        # Sidebar
+        self.sidebar = Sidebar()
+        content_layout.addWidget(self.sidebar)
+
+        # Pages stack
+        self.pages_stack = QStackedWidget()
+        self.pages_stack.setStyleSheet("background: transparent;")
+        
+        # Initialize pages
         self.dashboard = DashboardPage()
         self.processing = ImageProcessingPage(self.image_service)
         self.detection = VehicleDetectionPage(
@@ -43,60 +74,114 @@ class TrafficAIWindow(FluentWindow):
         self.history = HistoryPage(self.history_repository)
         self.settings = SettingsPage(self.settings_service)
 
-        self._init_navigation()
+        # Add pages to stack
+        self.pages_map = {
+            "dashboard": self.dashboard,
+            "processing": self.processing,
+            "detection": self.detection,
+            "analytics": self.analytics,
+            "history": self.history,
+            "settings": self.settings,
+        }
+        
+        for page in self.pages_map.values():
+            self.pages_stack.addWidget(page)
+        
+        content_layout.addWidget(self.pages_stack, 1)
+        main_layout.addLayout(content_layout, 1)
+
+        # Connect signals
         self._connect_signals()
-        self._init_status_bar()
+        
+        # Show dashboard
+        self.show_page("dashboard")
+
+        # Apply styles
         self.setStyleSheet(
             """
-            QWidget { font-family: 'Segoe UI', 'Microsoft YaHei UI'; }
-            QScrollArea { border: none; background: transparent; }
-            #MetricValue { color: #0078d4; }
+            QMainWindow {
+                background: #F8FAFB;
+            }
+            QWidget {
+                font-family: 'Segoe UI', 'Microsoft YaHei UI';
+            }
             """
-        )
-
-    def _init_navigation(self) -> None:
-        self.addSubInterface(self.dashboard, FluentIcon.HOME, "Dashboard")
-        self.addSubInterface(self.processing, FluentIcon.PHOTO, "Image Processing")
-        self.addSubInterface(self.detection, FluentIcon.ROBOT, "Vehicle Detection")
-        self.addSubInterface(self.analytics, FluentIcon.PIE_SINGLE, "Analytics")
-        self.addSubInterface(self.history, FluentIcon.HISTORY, "History")
-        self.addSubInterface(
-            self.settings,
-            FluentIcon.SETTING,
-            "Settings",
-            NavigationItemPosition.BOTTOM,
         )
 
     def _connect_signals(self) -> None:
+        """Connect all signal handlers."""
+        # Header actions
+        self.header.load_model_requested.connect(self._handle_load_model)
+        self.header.upload_image_requested.connect(self._handle_upload_image)
+        self.header.run_detection_requested.connect(self._handle_run_detection)
+        
+        # Sidebar navigation
+        self.sidebar.page_requested.connect(self.show_page)
+        
+        # Page interactions
         self.processing.image_changed.connect(self.detection.set_image)
         self.detection.detection_completed.connect(self._handle_detection_complete)
-        self.detection.model_status_changed.connect(self._set_model_status)
+        self.detection.model_status_changed.connect(self._update_model_status)
         self.settings.theme_changed.connect(self._toggle_theme)
         self.settings.model_path_changed.connect(self._set_model_path)
 
-    def _init_status_bar(self) -> None:
-        self.status = BodyLabel("Model status: not loaded  |  Ready")
-        self.status.setFixedHeight(32)
-        self.status.setStyleSheet("padding-left: 16px; color: #6b6b6b;")
-        self.widgetLayout.addWidget(self.status)
+    def show_page(self, key: str) -> None:
+        """Switch to specified page."""
+        if key in self.pages_map:
+            self.pages_stack.setCurrentWidget(self.pages_map[key])
+            self.sidebar.set_current(key)
+
+    def _handle_load_model(self) -> None:
+        """Handle load model button click."""
+        self.show_page("detection")
+        # The detection page has its own load model button
+
+    def _handle_upload_image(self) -> None:
+        """Handle upload image button click."""
+        self.show_page("processing")
+        # The processing page has its own upload button
+
+    def _handle_run_detection(self) -> None:
+        """Handle run detection button click."""
+        self.show_page("detection")
+        # The detection page can run detection
 
     def _handle_detection_complete(self, summary) -> None:
+        """Update UI after detection completes."""
         self.dashboard.update_summary(summary, self.detection_service.model_name)
         self.analytics.add_summary(summary)
         self.history.refresh()
-        self.status.setText(
-            f"Model status: {self.detection_service.model_name}  |  "
-            f"Last run: {summary.total} vehicles in {summary.processing_time:.2f}s"
-        )
+        
+        # Update header status
+        self.header.set_status(self.detection_service.model_name, "loaded")
 
-    def _set_model_status(self, message: str) -> None:
-        self.status.setText(f"Model status: {message}  |  Ready")
+    def _update_model_status(self, message: str) -> None:
+        """Update model status in header."""
+        message_lower = message.lower()
+        
+        if "loaded" in message_lower and "not" not in message_lower:
+            state = "loaded"
+            text = message
+        elif "loading" in message_lower:
+            state = "loading"
+            text = message
+        elif "processing" in message_lower:
+            state = "processing"
+            text = message
+        else:
+            state = "not_loaded"
+            text = message
+        
+        self.header.set_status(text, state)
 
     def _toggle_theme(self, dark: bool) -> None:
+        """Toggle between light and dark theme."""
         theme = Theme.DARK if dark else Theme.LIGHT
         self.settings_service.theme = theme
         setTheme(theme)
 
     def _set_model_path(self, path: str) -> None:
+        """Update model path in detection service."""
         self.detection_service.model_path = path
-        self.status.setText(f"Model status: selected {path}")
+        filename = path.split('/')[-1] if '/' in path else path.split('\\')[-1]
+        self.header.set_status(f"Selected: {filename}", "processing")
