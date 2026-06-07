@@ -13,6 +13,7 @@ from qfluentwidgets import BodyLabel, CardWidget, CheckBox, FluentIcon, IconWidg
 from .base import Page
 from ..services.image_service import ImageEnhancementService
 from ..widgets.image_viewer import ImageViewer
+from ..widgets.chart_widgets import HistogramWidget
 from ..utils.theme import CARD_BORDER, PRIMARY, SECONDARY_TEXT, SUCCESS
 
 
@@ -182,6 +183,59 @@ class ImageProcessingPage(Page):
         self.layout.addLayout(preview_grid)
         self.layout.addSpacing(8)
 
+        self.analysis_card = ControlCard("Image Analysis", FluentIcon.PIE_SINGLE)
+        analysis_grid = QGridLayout()
+        analysis_grid.setSpacing(12)
+        self.original_histogram = HistogramWidget("#0F6CBD")
+        self.enhanced_histogram = HistogramWidget("#16A34A")
+        analysis_grid.addWidget(BodyLabel("Original Histogram"), 0, 0)
+        analysis_grid.addWidget(BodyLabel("Enhanced Histogram"), 0, 1)
+        analysis_grid.addWidget(self.original_histogram, 1, 0)
+        analysis_grid.addWidget(self.enhanced_histogram, 1, 1)
+        self.analysis_card.main_layout.addLayout(analysis_grid)
+
+        metrics_row = QHBoxLayout()
+        metrics_row.setSpacing(12)
+        self.analysis_labels = {
+            "brightness": BodyLabel("Mean Brightness\nOriginal: --\nEnhanced: --"),
+            "contrast": BodyLabel("Contrast\nOriginal: --\nEnhanced: --"),
+            "range": BodyLabel("Dynamic Range\nOriginal: --\nEnhanced: --"),
+            "noise": BodyLabel("Noise Estimate\nOriginal: --\nEnhanced: --"),
+        }
+        for label in self.analysis_labels.values():
+            label.setWordWrap(True)
+            label.setStyleSheet(
+                f"""
+                BodyLabel {{
+                    background: rgba(255, 255, 255, 0.68);
+                    border: 1px solid {CARD_BORDER};
+                    border-radius: 10px;
+                    padding: 10px;
+                    font-size: 12px;
+                    font-weight: 650;
+                    color: {SECONDARY_TEXT};
+                }}
+                """
+            )
+            metrics_row.addWidget(label)
+        self.analysis_card.main_layout.addLayout(metrics_row)
+
+        explanation = BodyLabel(
+            "CLAHE and Gamma Correction are applied to improve contrast and compensate for non-uniform "
+            "illumination, addressing common limitations of histogram-based segmentation methods."
+        )
+        explanation.setWordWrap(True)
+        explanation.setStyleSheet(
+            f"""
+            font-size: 13px;
+            color: {SECONDARY_TEXT};
+            line-height: 1.6;
+            """
+        )
+        self.analysis_card.main_layout.addWidget(explanation)
+        self.layout.addWidget(self.analysis_card)
+        self.layout.addSpacing(8)
+
         # Control panels - vertical layout for better display
         controls_container = QVBoxLayout()
         controls_container.setSpacing(20)
@@ -308,6 +362,7 @@ class ImageProcessingPage(Page):
             median_kernel=self.median_slider.value(),
         )
         self.enhanced_view.set_image(self.enhanced_image)
+        self.update_image_analysis()
         self.image_changed.emit(self.enhanced_image, Path(self.image_path).name)
         
         self.status_label.setText("● Preview Updated")
@@ -323,6 +378,29 @@ class ImageProcessingPage(Page):
         
         if self.original_image is not None:
             self.apply_live_preview()
+
+    def update_image_analysis(self) -> None:
+        """Refresh histogram and quality metrics for original/enhanced images."""
+        if self.original_image is None or self.enhanced_image is None:
+            return
+
+        self.original_histogram.set_histogram(self.image_service.grayscale_histogram(self.original_image))
+        self.enhanced_histogram.set_histogram(self.image_service.grayscale_histogram(self.enhanced_image))
+
+        original = self.image_service.quality_metrics(self.original_image)
+        enhanced = self.image_service.quality_metrics(self.enhanced_image)
+        mapping = {
+            "brightness": ("Mean Brightness", "brightness"),
+            "contrast": ("Contrast", "contrast"),
+            "range": ("Dynamic Range", "dynamic_range"),
+            "noise": ("Noise Estimate", "noise"),
+        }
+        for label_key, (title, metric_key) in mapping.items():
+            self.analysis_labels[label_key].setText(
+                f"{title}\n"
+                f"Original: {original[metric_key]:.1f}\n"
+                f"Enhanced: {enhanced[metric_key]:.1f}"
+            )
 
     def apply_and_continue(self) -> None:
         """Apply enhancements and switch to detection page."""

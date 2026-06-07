@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
@@ -161,4 +162,50 @@ class VehicleBarChartWidget(QWidget):
                 Qt.AlignmentFlag.AlignCenter,
                 str(value),
             )
+
+
+class HistogramWidget(QWidget):
+    """Lightweight grayscale histogram chart."""
+
+    def __init__(self, color: str = "#0F6CBD") -> None:
+        super().__init__()
+        self.histogram = np.zeros(256, dtype=float)
+        self.color = QColor(color)
+        self.setMinimumHeight(180)
+
+    def set_histogram(self, histogram: np.ndarray | None) -> None:
+        if histogram is None:
+            self.histogram = np.zeros(256, dtype=float)
+        else:
+            self.histogram = histogram.astype(float)
+        self.update()
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        rect = self.rect().adjusted(34, 18, -12, -28)
+
+        painter.setPen(QPen(QColor("#D7DEE8"), 1))
+        painter.drawRect(rect)
+        for index in range(1, 4):
+            y = rect.top() + int(rect.height() * index / 4)
+            painter.drawLine(rect.left(), y, rect.right(), y)
+
+        max_value = float(np.max(self.histogram)) if self.histogram.size else 0.0
+        if max_value <= 0:
+            painter.setPen(QColor("#8A94A6"))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "No histogram data")
+            return
+
+        painter.setPen(QPen(self.color, 1))
+        step = rect.width() / 256
+        for index, value in enumerate(self.histogram):
+            x = rect.left() + index * step
+            height = int(rect.height() * value / max_value)
+            painter.drawLine(int(x), rect.bottom(), int(x), rect.bottom() - height)
+
+        painter.setPen(QColor("#6B7280"))
+        painter.drawText(rect.left() - 22, rect.bottom() + 18, "0")
+        painter.drawText(rect.right() - 24, rect.bottom() + 18, "255")
 

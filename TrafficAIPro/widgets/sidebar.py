@@ -146,6 +146,7 @@ class Sidebar(QFrame):
             ("dashboard", "Dashboard", FluentIcon.HOME),
             ("processing", "Image Processing", FluentIcon.PHOTO),
             ("detection", "Vehicle Detection", FluentIcon.ROBOT),
+            ("video", "Video Analysis", FluentIcon.VIDEO),
             ("analytics", "Analytics", FluentIcon.PIE_SINGLE),
             ("history", "History", FluentIcon.HISTORY),
         ]
@@ -169,4 +170,3 @@ class Sidebar(QFrame):
     def set_current(self, key: str) -> None:
         for item_key, item in self.items.items():
             item.set_selected(item_key == key)
-

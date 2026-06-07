@@ -13,6 +13,7 @@ from ..pages.detection import VehicleDetectionPage
 from ..pages.history import HistoryPage
 from ..pages.image_processing import ImageProcessingPage
 from ..pages.settings import SettingsPage
+from ..pages.video_analysis import VideoAnalysisPage
 from ..services.detection_service import VehicleDetectionService
 from ..services.image_service import ImageEnhancementService
 from ..services.settings_service import SettingsService
@@ -70,6 +71,11 @@ class TrafficAIWindow(QMainWindow):
             self.settings_service,
             self.history_repository,
         )
+        self.video = VideoAnalysisPage(
+            self.image_service,
+            self.detection_service,
+            self.settings_service,
+        )
         self.analytics = AnalyticsPage()
         self.history = HistoryPage(self.history_repository)
         self.settings = SettingsPage(self.settings_service)
@@ -79,6 +85,7 @@ class TrafficAIWindow(QMainWindow):
             "dashboard": self.dashboard,
             "processing": self.processing,
             "detection": self.detection,
+            "video": self.video,
             "analytics": self.analytics,
             "history": self.history,
             "settings": self.settings,
