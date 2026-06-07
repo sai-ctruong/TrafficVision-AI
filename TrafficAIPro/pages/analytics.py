@@ -316,7 +316,7 @@ class AnalyticsPage(Page):
         self.layout.addLayout(bottom_grid)
         self.layout.addStretch(1)
 
-        self._summaries: list[DetectionSummary] = []
+        self.latest_summary: DetectionSummary | None = None
         self.refresh()
 
     def _build_comparison_card(self) -> GlassCard:
@@ -391,7 +391,7 @@ class AnalyticsPage(Page):
         return card
 
     def add_summary(self, summary: DetectionSummary) -> None:
-        self._summaries.append(summary)
+        self.latest_summary = summary
         self.refresh()
 
     def update_enhancement_comparison(
@@ -448,9 +448,9 @@ class AnalyticsPage(Page):
 
     def refresh(self) -> None:
         totals = {key: 0 for key in VEHICLE_CLASSES}
-        for summary in self._summaries:
+        if self.latest_summary is not None:
             for key in VEHICLE_CLASSES:
-                totals[key] += summary.counts.get(key, 0)
+                totals[key] = self.latest_summary.counts.get(key, 0)
         self.pie.set_values(totals)
 
         self.bar.set_values(totals)

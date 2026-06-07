@@ -12,7 +12,6 @@ from ..pages.dashboard import DashboardPage
 from ..pages.detection import VehicleDetectionPage
 from ..pages.history import HistoryPage
 from ..pages.image_processing import ImageProcessingPage
-from ..pages.settings import SettingsPage
 from ..pages.video_analysis import VideoAnalysisPage
 from ..services.detection_service import VehicleDetectionService
 from ..services.image_service import ImageEnhancementService
@@ -78,7 +77,6 @@ class TrafficAIWindow(QMainWindow):
         )
         self.analytics = AnalyticsPage()
         self.history = HistoryPage(self.history_repository)
-        self.settings = SettingsPage(self.settings_service)
 
         # Add pages to stack
         self.pages_map = {
@@ -88,7 +86,6 @@ class TrafficAIWindow(QMainWindow):
             "video": self.video,
             "analytics": self.analytics,
             "history": self.history,
-            "settings": self.settings,
         }
         
         for page in self.pages_map.values():
@@ -129,8 +126,6 @@ class TrafficAIWindow(QMainWindow):
         self.processing.image_changed.connect(self.detection.set_image)
         self.detection.detection_completed.connect(self._handle_detection_complete)
         self.detection.model_status_changed.connect(self._update_model_status)
-        self.settings.theme_changed.connect(self._toggle_theme)
-        self.settings.model_path_changed.connect(self._set_model_path)
 
     def show_page(self, key: str) -> None:
         """Switch to specified page."""
@@ -176,7 +171,7 @@ class TrafficAIWindow(QMainWindow):
                 _, original_summary = self.detection_service.detect(
                     original_image,
                     f"Original {enhanced_summary.image_name}",
-                    self.settings_service.confidence,
+                    0.25,
                 )
             except Exception:
                 original_summary = None

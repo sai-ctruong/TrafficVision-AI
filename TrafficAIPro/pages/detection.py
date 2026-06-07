@@ -18,6 +18,9 @@ from ..widgets.image_viewer import ImageViewer
 from ..widgets.metric_card import MetricCard
 
 
+DEFAULT_DETECTION_CONFIDENCE = 0.25
+
+
 class VehicleDetectionPage(Page):
     """YOLO26 vehicle detection workflow."""
 
@@ -71,6 +74,7 @@ class VehicleDetectionPage(Page):
     def set_image(self, image: np.ndarray, image_name: str) -> None:
         self.current_image = image
         self.current_name = image_name
+        self.detection_service.reset_inference_state()
 
     def load_model(self) -> None:
         path = self.settings.model_path
@@ -101,7 +105,7 @@ class VehicleDetectionPage(Page):
             annotated, summary = self.detection_service.detect(
                 self.current_image,
                 self.current_name,
-                self.settings.confidence,
+                DEFAULT_DETECTION_CONFIDENCE,
             )
             self.result_view.set_image(annotated)
             self._update_cards(summary)

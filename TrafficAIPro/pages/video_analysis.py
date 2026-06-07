@@ -7,7 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QFileDialog,
     QComboBox,
@@ -35,6 +35,7 @@ TRACKER_FILES = {
     "ByteTrack": "bytetrack.yaml",
     "BoT-SORT": "botsort.yaml",
 }
+DEFAULT_VIDEO_CONFIDENCE = 0.25
 INFERENCE_FRAME_INTERVAL = 2
 
 
@@ -71,99 +72,153 @@ class VideoAnalysisPage(Page):
         self.timer.timeout.connect(self.process_next_frame)
 
         self._build_controls()
-        self._build_explanation()
         self._build_main_panels()
         self._build_timeline()
         self.layout.addStretch(1)
 
     def _build_controls(self) -> None:
-        actions = QHBoxLayout()
-        actions.setSpacing(10)
+        controls_grid = QGridLayout()
+        controls_grid.setHorizontalSpacing(20)
+        controls_grid.setVerticalSpacing(8)
 
         self.open_button = PrimaryPushButton(FluentIcon.VIDEO, "Open Video")
         self.open_button.clicked.connect(self.open_video)
-        actions.addWidget(self.open_button)
 
         self.start_button = PushButton(FluentIcon.PLAY, "Start")
         self.start_button.clicked.connect(self.start_video)
-        actions.addWidget(self.start_button)
 
         self.reset_button = PushButton(FluentIcon.SYNC, "Reset")
         self.reset_button.clicked.connect(self.reset_video)
-        actions.addWidget(self.reset_button)
 
-        self.tracking_check = CheckBox("Enable Tracking")
+        self.tracking_check = CheckBox("Track")
         self.tracking_check.setChecked(True)
         self.tracking_check.stateChanged.connect(self._reset_tracking_state)
-        actions.addWidget(self.tracking_check)
+        self.track_id_check = CheckBox("Track ID")
+        self.track_id_check.setChecked(True)
+        self.line_check = CheckBox("Line")
+        self.line_check.setChecked(True)
+        self.enhance_check = CheckBox("Enhance")
 
-        actions.addWidget(BodyLabel("Tracker"))
         self.tracker_combo = QComboBox()
         self.tracker_combo.addItems(TRACKER_FILES.keys())
+        self.tracker_combo.setFixedWidth(118)
         self.tracker_combo.currentTextChanged.connect(lambda _: self._reset_tracking_state())
-        actions.addWidget(self.tracker_combo)
 
-        actions.addWidget(BodyLabel("Confidence"))
         self.confidence_spin = QDoubleSpinBox()
         self.confidence_spin.setRange(0.05, 0.95)
         self.confidence_spin.setSingleStep(0.05)
-        self.confidence_spin.setValue(max(0.05, min(0.95, self.settings.confidence)))
-        actions.addWidget(self.confidence_spin)
+        self.confidence_spin.setValue(DEFAULT_VIDEO_CONFIDENCE)
+        self.confidence_spin.setFixedWidth(116)
 
-        actions.addWidget(BodyLabel("IOU"))
         self.iou_spin = QDoubleSpinBox()
         self.iou_spin.setRange(0.10, 0.95)
         self.iou_spin.setSingleStep(0.05)
         self.iou_spin.setValue(0.50)
-        actions.addWidget(self.iou_spin)
+        self.iou_spin.setFixedWidth(110)
 
-        self.track_id_check = CheckBox("Show Track ID")
-        self.track_id_check.setChecked(True)
-        actions.addWidget(self.track_id_check)
-
-        self.line_check = CheckBox("Show Counting Line")
-        self.line_check.setChecked(True)
-        actions.addWidget(self.line_check)
-
-        self.enhance_check = CheckBox("Enhance RGB")
-        actions.addWidget(self.enhance_check)
-
-        actions.addStretch(1)
-        self.layout.addLayout(actions)
-
-        line_controls = QHBoxLayout()
-        line_controls.setSpacing(10)
-        line_controls.addWidget(BodyLabel("Counting Line"))
         self.line_orientation = QComboBox()
         self.line_orientation.addItems(["Horizontal", "Vertical"])
+        self.line_orientation.setFixedWidth(118)
         self.line_orientation.currentTextChanged.connect(self._line_orientation_changed)
-        line_controls.addWidget(self.line_orientation)
-        line_controls.addWidget(BodyLabel("Position"))
+
         self.line_position = QSpinBox()
         self.line_position.setRange(0, 9999)
         self.line_position.setValue(0)
         self.line_position.setSuffix(" px")
-        line_controls.addWidget(self.line_position)
-        line_controls.addStretch(1)
-        self.layout.addLayout(line_controls)
+        self.line_position.setFixedWidth(112)
 
-    def _build_explanation(self) -> None:
-        explanation = BodyLabel(
-            "Tracking is used to assign a unique ID to each detected vehicle across frames. "
-            "This prevents repeated counting of the same vehicle in multiple frames."
-        )
-        explanation.setWordWrap(True)
-        explanation.setStyleSheet(
+        playback_group = self._control_group("Playback", (self.open_button, self.start_button, self.reset_button))
+        display_group = self._control_group("Display", (
+            self.track_id_check,
+            self.line_check,
+            self.enhance_check,
+            BodyLabel("Line"),
+            self.line_orientation,
+            BodyLabel("Pos"),
+            self.line_position,
+        ))
+        detection_group = self._control_group("Detection", (
+            self.tracking_check,
+            BodyLabel("Tracker"),
+            self.tracker_combo,
+            BodyLabel("Conf"),
+            self.confidence_spin,
+            BodyLabel("IOU"),
+            self.iou_spin,
+        ))
+        detection_group.setFixedWidth(830)
+
+        controls_grid.addWidget(playback_group, 0, 0)
+        controls_grid.addWidget(display_group, 0, 1)
+        controls_grid.addWidget(detection_group, 1, 0, 1, 2)
+        controls_grid.setAlignment(detection_group, Qt.AlignmentFlag.AlignHCenter)
+        controls_grid.setColumnStretch(0, 1)
+        controls_grid.setColumnStretch(1, 1)
+        self.layout.addLayout(controls_grid)
+        self.layout.addSpacing(10)
+        self._style_control_inputs()
+
+    def _control_group(self, title: str, widgets: tuple[QWidget, ...]) -> CardWidget:
+        group = CardWidget()
+        group.setBorderRadius(8)
+        group.setStyleSheet(
             f"""
-            font-size: 13px;
-            color: {SECONDARY_TEXT};
-            background: rgba(255, 255, 255, 0.92);
-            border: 1px solid {CARD_BORDER};
-            border-radius: 8px;
-            padding: 12px;
+            CardWidget {{
+                background: rgba(255, 255, 255, 0.68);
+                border: 1px solid {CARD_BORDER};
+            }}
             """
         )
-        self.layout.addWidget(explanation)
+        root = QVBoxLayout(group)
+        root.setContentsMargins(12, 8, 12, 10)
+        root.setSpacing(6)
+
+        title_label = BodyLabel(title)
+        title_label.setStyleSheet(f"font-size: 12px; font-weight: 800; color: {PRIMARY};")
+        root.addWidget(title_label)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        for widget in widgets:
+            row.addWidget(widget)
+        root.addLayout(row)
+        return group
+
+    def _style_control_inputs(self) -> None:
+        input_style = """
+            QComboBox, QSpinBox, QDoubleSpinBox {
+                color: #111827;
+                background: rgba(255, 255, 255, 0.92);
+                border: 1px solid rgba(148, 163, 184, 0.85);
+                border-radius: 6px;
+                padding: 5px 16px 5px 9px;
+                selection-background-color: #DCEEFF;
+                selection-color: #111827;
+            }
+            QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover {
+                border-color: #0F6CBD;
+                background: #FFFFFF;
+            }
+            QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {
+                color: #6B7280;
+                background: rgba(255, 255, 255, 0.70);
+            }
+            QComboBox QAbstractItemView {
+                color: #111827;
+                background: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                selection-background-color: #DCEEFF;
+                selection-color: #111827;
+            }
+        """
+        for widget in (
+            self.tracker_combo,
+            self.confidence_spin,
+            self.iou_spin,
+            self.line_orientation,
+            self.line_position,
+        ):
+            widget.setStyleSheet(input_style)
 
     def _build_main_panels(self) -> None:
         grid = QGridLayout()

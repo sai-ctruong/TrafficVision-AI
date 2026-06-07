@@ -48,6 +48,7 @@ class VehicleDetectionService:
         self.device = self._preferred_device()
         self.model = YOLO(self.model_path)
         self.model_name = Path(self.model_path).name
+        self.reset_inference_state()
 
     def detect(
         self,
@@ -59,6 +60,7 @@ class VehicleDetectionService:
         if self.model is None:
             raise RuntimeError("Model is not loaded")
 
+        self.reset_inference_state()
         started = time.perf_counter()
         results = self.model(
             image,
@@ -185,6 +187,10 @@ class VehicleDetectionService:
 
     def reset_tracking(self) -> None:
         """Clear Ultralytics tracker state between videos or tracker changes."""
+        self.reset_inference_state()
+
+    def reset_inference_state(self) -> None:
+        """Clear cached Ultralytics predictor/tracker state before a new source."""
         if self.model is not None and getattr(self.model, "predictor", None) is not None:
             self.model.predictor = None
 

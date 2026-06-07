@@ -159,12 +159,6 @@ class Sidebar(QFrame):
 
         layout.addStretch(1)
 
-        # Settings at bottom
-        settings = NavItem("settings", "Settings", FluentIcon.SETTING)
-        settings.clicked.connect(self.page_requested)
-        self.items["settings"] = settings
-        layout.addWidget(settings)
-
         self.set_current("dashboard")
 
     def set_current(self, key: str) -> None:
