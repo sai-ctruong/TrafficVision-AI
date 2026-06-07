@@ -59,8 +59,6 @@ class VideoAnalysisPage(Page):
         self.last_tick = time.perf_counter()
 
         self.tracked_ids = {name: set() for name in VEHICLE_CLASSES}
-        self.crossed_counts = {name: 0 for name in VEHICLE_CLASSES}
-        self.counted_ids: set[int] = set()
         self.previous_centers: dict[int, tuple[int, int]] = {}
         self.track_labels: dict[int, str] = {}
         self.line_initialized = False
@@ -205,12 +203,11 @@ class VideoAnalysisPage(Page):
 
         self.stat_labels: dict[str, QLabel] = {}
         for key, label in [
-            ("total", "Total Vehicles"),
-            ("car", "Cars"),
-            ("bus", "Buses"),
-            ("truck", "Trucks"),
-            ("van", "Vans"),
-            ("crossed", "Vehicles Crossed Line"),
+            ("total", "Total Unique Vehicles"),
+            ("car", "Unique Cars"),
+            ("bus", "Unique Buses"),
+            ("truck", "Unique Trucks"),
+            ("van", "Unique Vans"),
             ("frame", "Current Frame"),
             ("fps", "FPS"),
             ("time", "Processing Time"),
@@ -376,8 +373,6 @@ class VideoAnalysisPage(Page):
 
     def _reset_tracking_state(self, *_args: object) -> None:
         self.tracked_ids = {name: set() for name in VEHICLE_CLASSES}
-        self.crossed_counts = {name: 0 for name in VEHICLE_CLASSES}
-        self.counted_ids.clear()
         self.previous_centers.clear()
         self.track_labels.clear()
         self.last_annotated_frame = None
@@ -411,23 +406,7 @@ class VideoAnalysisPage(Page):
             normalized_id = int(track_id)
             self.tracked_ids[label].add(normalized_id)
             self.track_labels[normalized_id] = label
-
-            previous = self.previous_centers.get(normalized_id)
-            if previous is not None and normalized_id not in self.counted_ids:
-                if self._crossed_line(previous, center):
-                    self.counted_ids.add(normalized_id)
-                    self.crossed_counts[label] += 1
             self.previous_centers[normalized_id] = center
-
-    def _crossed_line(self, previous: tuple[int, int], current: tuple[int, int]) -> bool:
-        position = self.line_position.value()
-        if self.line_orientation.currentText() == "Horizontal":
-            previous_side = previous[1] - position
-            current_side = current[1] - position
-        else:
-            previous_side = previous[0] - position
-            current_side = current[0] - position
-        return previous_side == 0 or current_side == 0 or (previous_side < 0 < current_side) or (current_side < 0 < previous_side)
 
     def _draw_counting_line(self, image: np.ndarray) -> None:
         height, width = image.shape[:2]
@@ -441,12 +420,10 @@ class VideoAnalysisPage(Page):
             cv2.putText(image, "Counting Line", (min(width - 210, position + 10), 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2, cv2.LINE_AA)
 
     def _update_analytics(self, fps: float, processing_time: float, average_confidence: float) -> None:
-        crossed_total = sum(self.crossed_counts.values())
         total_unique = sum(len(ids) for ids in self.tracked_ids.values())
         self.stat_labels["total"].setText(str(total_unique))
         for label in VEHICLE_CLASSES:
-            self.stat_labels[label].setText(str(self.crossed_counts[label]))
-        self.stat_labels["crossed"].setText(str(crossed_total))
+            self.stat_labels[label].setText(str(len(self.tracked_ids[label])))
         self.stat_labels["frame"].setText(f"{self.frame_index}/{self.total_frames or '-'}")
         self.stat_labels["fps"].setText(f"{fps:.1f}")
         self.stat_labels["time"].setText(f"{processing_time * 1000:.0f} ms")
