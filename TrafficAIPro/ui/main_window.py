@@ -16,6 +16,7 @@ from ..pages.video_analysis import VideoAnalysisPage
 from ..services.detection_service import VehicleDetectionService
 from ..services.image_service import ImageEnhancementService
 from ..services.settings_service import SettingsService
+from ..utils.theme import APP_BACKGROUND, app_style_sheet
 from ..widgets.app_header import AppHeader
 from ..widgets.sidebar import Sidebar
 
@@ -100,16 +101,9 @@ class TrafficAIWindow(QMainWindow):
         # Show dashboard
         self.show_page("dashboard")
 
-        # Apply styles
+        # Apply global Warm Editorial QSS
         self.setStyleSheet(
-            """
-            QMainWindow {
-                background: #F8FAFB;
-            }
-            QWidget {
-                font-family: 'Segoe UI', 'Microsoft YaHei UI';
-            }
-            """
+            f"QMainWindow {{ background: {APP_BACKGROUND}; }}" + app_style_sheet()
         )
 
     def _connect_signals(self) -> None:
@@ -132,6 +126,16 @@ class TrafficAIWindow(QMainWindow):
         if key in self.pages_map:
             self.pages_stack.setCurrentWidget(self.pages_map[key])
             self.sidebar.set_current(key)
+            eyebrow_map = {
+                "dashboard": "Workspace",
+                "processing": "Pre-processing",
+                "detection": "Inference",
+                "video": "Live Tracking",
+                "analytics": "Reports",
+                "history": "Detection History",
+            }
+            if hasattr(self.header, "set_eyebrow"):
+                self.header.set_eyebrow(eyebrow_map.get(key, "Workspace"))
 
     def _handle_load_model(self) -> None:
         """Handle load model button click."""
@@ -201,6 +205,14 @@ class TrafficAIWindow(QMainWindow):
             text = message
         
         self.header.set_status(text, state)
+        sidebar_palette = {
+            "loaded": "#4A6741",
+            "loading": "#C9882A",
+            "processing": "#C9882A",
+            "error": "#C4512A",
+            "not_loaded": "#C4512A",
+        }
+        self.sidebar.set_status(text, sidebar_palette.get(state, "#9A7560"))
 
     def _toggle_theme(self, dark: bool) -> None:
         """Toggle between light and dark theme."""

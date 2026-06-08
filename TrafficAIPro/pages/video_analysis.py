@@ -26,7 +26,27 @@ from ..models.detection import DetectionSummary, VEHICLE_CLASSES
 from ..services.detection_service import VehicleDetectionService
 from ..services.image_service import ImageEnhancementService
 from ..services.settings_service import SettingsService
-from ..utils.theme import CARD_BORDER, PRIMARY, SECONDARY_TEXT, SUCCESS, TEXT
+from ..utils.theme import (
+    BORDER,
+    CARD_BORDER,
+    DIVIDER,
+    FONT_SERIF,
+    GOLD,
+    INK,
+    INK_3,
+    PRIMARY,
+    PRIMARY_HOVER,
+    PRIMARY_PRESSED,
+    RUST,
+    SAGE,
+    SAND,
+    SAND_2,
+    SECONDARY_TEXT,
+    SLATE,
+    SUCCESS,
+    TEXT,
+    TEXT_FAINT,
+)
 from ..widgets.image_viewer import ImageViewer
 from .base import Page
 
@@ -49,6 +69,10 @@ class VideoAnalysisPage(Page):
         settings: SettingsService,
     ) -> None:
         super().__init__("Video Analysis", "VideoAnalysisPage")
+        # Tighter page rhythm so the toolbar + stats + 2 videos fit
+        # a single 940 px viewport without scrolling.
+        self.layout.setContentsMargins(28, 18, 28, 22)
+        self.layout.setSpacing(12)
         self.image_service = image_service
         self.detection_service = detection_service
         self.settings = settings
@@ -77,19 +101,78 @@ class VideoAnalysisPage(Page):
         self.layout.addStretch(1)
 
     def _build_controls(self) -> None:
-        controls_grid = QGridLayout()
-        controls_grid.setHorizontalSpacing(20)
-        controls_grid.setVerticalSpacing(8)
+        """Single compact toolbar — all controls fit in one row,
+        grouped by hairline vertical dividers. Designed to keep the
+        page short enough that the videos + stats fit in one viewport.
+        """
+        toolbar = CardWidget()
+        toolbar.setBorderRadius(10)
+        toolbar.setStyleSheet(
+            f"""
+            CardWidget {{
+                background: {SAND};
+                border: 1px solid {BORDER};
+            }}
+            """
+        )
+        toolbar_layout = QVBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(14, 8, 14, 8)
+        toolbar_layout.setSpacing(8)
+
+        # ----- Row 1: playback buttons + display toggles -----------------
+        row1 = QHBoxLayout()
+        row1.setSpacing(8)
+
+        # Buttons — full style with background, border AND padding-left for
+        # icon (qfluentwidgets draws its icon outside Qt's text rect).
+        primary_css = (
+            f"PrimaryPushButton {{"
+            f" background: {PRIMARY};"
+            f" color: white;"
+            f" border: none;"
+            f" border-radius: 8px;"
+            f" padding: 0 14px 0 30px;"
+            f" font-size: 12.5px;"
+            f" font-weight: 700;"
+            f"}}"
+            f"PrimaryPushButton:hover {{ background: {PRIMARY_HOVER}; }}"
+            f"PrimaryPushButton:pressed {{ background: {PRIMARY_PRESSED}; }}"
+        )
+        ghost_css = (
+            f"PushButton {{"
+            f" background: {SAND};"
+            f" color: {INK};"
+            f" border: 1px solid {BORDER};"
+            f" border-radius: 8px;"
+            f" padding: 0 14px 0 28px;"
+            f" font-size: 12.5px;"
+            f" font-weight: 600;"
+            f"}}"
+            f"PushButton:hover {{ background: {SAND_2}; border: 1px solid #C4AA96; }}"
+            f"PushButton:pressed {{ background: #E0D9CB; }}"
+        )
 
         self.open_button = PrimaryPushButton(FluentIcon.VIDEO, "Open Video")
+        self.open_button.setStyleSheet(primary_css)
         self.open_button.clicked.connect(self.open_video)
 
         self.start_button = PushButton(FluentIcon.PLAY, "Start")
+        self.start_button.setStyleSheet(ghost_css)
         self.start_button.clicked.connect(self.start_video)
 
         self.reset_button = PushButton(FluentIcon.SYNC, "Reset")
+        self.reset_button.setStyleSheet(ghost_css)
         self.reset_button.clicked.connect(self.reset_video)
 
+        for btn in (self.open_button, self.start_button, self.reset_button):
+            btn.setFixedHeight(32)
+            btn.setMinimumWidth(90)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            row1.addWidget(btn)
+
+        row1.addWidget(self._vdiv())
+
+        # Toggles — keep original names: Track, Track ID, Line, Enhance
         self.tracking_check = CheckBox("Track")
         self.tracking_check.setChecked(True)
         self.tracking_check.stateChanged.connect(self._reset_tracking_state)
@@ -98,118 +181,109 @@ class VideoAnalysisPage(Page):
         self.line_check = CheckBox("Line")
         self.line_check.setChecked(True)
         self.enhance_check = CheckBox("Enhance")
+        check_css = (
+            f"CheckBox {{ color: {INK}; font-size: 12px; font-weight: 500; "
+            f"spacing: 6px; padding: 0 2px; }}"
+        )
+        for cb in (self.tracking_check, self.track_id_check, self.line_check, self.enhance_check):
+            cb.setStyleSheet(check_css)
+            row1.addWidget(cb)
+
+        row1.addStretch(1)
+        toolbar_layout.addLayout(row1)
+
+        # ----- Row 2: detection params + counting-line params -----------
+        row2 = QHBoxLayout()
+        row2.setSpacing(8)
 
         self.tracker_combo = QComboBox()
         self.tracker_combo.addItems(TRACKER_FILES.keys())
-        self.tracker_combo.setFixedWidth(118)
+        self.tracker_combo.setFixedWidth(100)
         self.tracker_combo.currentTextChanged.connect(lambda _: self._reset_tracking_state())
+        row2.addWidget(self._lbl("Tracker"))
+        row2.addWidget(self.tracker_combo)
 
         self.confidence_spin = QDoubleSpinBox()
         self.confidence_spin.setRange(0.05, 0.95)
         self.confidence_spin.setSingleStep(0.05)
         self.confidence_spin.setValue(DEFAULT_VIDEO_CONFIDENCE)
-        self.confidence_spin.setFixedWidth(116)
+        self.confidence_spin.setFixedWidth(76)
+        row2.addWidget(self._lbl("Conf"))
+        row2.addWidget(self.confidence_spin)
 
         self.iou_spin = QDoubleSpinBox()
         self.iou_spin.setRange(0.10, 0.95)
         self.iou_spin.setSingleStep(0.05)
         self.iou_spin.setValue(0.50)
-        self.iou_spin.setFixedWidth(110)
+        self.iou_spin.setFixedWidth(76)
+        row2.addWidget(self._lbl("IOU"))
+        row2.addWidget(self.iou_spin)
+
+        row2.addWidget(self._vdiv())
 
         self.line_orientation = QComboBox()
         self.line_orientation.addItems(["Horizontal", "Vertical"])
-        self.line_orientation.setFixedWidth(118)
+        self.line_orientation.setFixedWidth(100)
         self.line_orientation.currentTextChanged.connect(self._line_orientation_changed)
+        row2.addWidget(self._lbl("Counting Line"))
+        row2.addWidget(self.line_orientation)
 
         self.line_position = QSpinBox()
         self.line_position.setRange(0, 9999)
         self.line_position.setValue(0)
         self.line_position.setSuffix(" px")
-        self.line_position.setFixedWidth(112)
+        self.line_position.setFixedWidth(88)
+        row2.addWidget(self._lbl("Position"))
+        row2.addWidget(self.line_position)
 
-        playback_group = self._control_group("Playback", (self.open_button, self.start_button, self.reset_button))
-        display_group = self._control_group("Display", (
-            self.track_id_check,
-            self.line_check,
-            self.enhance_check,
-            BodyLabel("Line"),
-            self.line_orientation,
-            BodyLabel("Pos"),
-            self.line_position,
-        ))
-        detection_group = self._control_group("Detection", (
-            self.tracking_check,
-            BodyLabel("Tracker"),
-            self.tracker_combo,
-            BodyLabel("Conf"),
-            self.confidence_spin,
-            BodyLabel("IOU"),
-            self.iou_spin,
-        ))
-        detection_group.setFixedWidth(830)
+        row2.addStretch(1)
+        toolbar_layout.addLayout(row2)
 
-        controls_grid.addWidget(playback_group, 0, 0)
-        controls_grid.addWidget(display_group, 0, 1)
-        controls_grid.addWidget(detection_group, 1, 0, 1, 2)
-        controls_grid.setAlignment(detection_group, Qt.AlignmentFlag.AlignHCenter)
-        controls_grid.setColumnStretch(0, 1)
-        controls_grid.setColumnStretch(1, 1)
-        self.layout.addLayout(controls_grid)
-        self.layout.addSpacing(10)
+        self.layout.addWidget(toolbar)
         self._style_control_inputs()
 
-    def _control_group(self, title: str, widgets: tuple[QWidget, ...]) -> CardWidget:
-        group = CardWidget()
-        group.setBorderRadius(8)
-        group.setStyleSheet(
-            f"""
-            CardWidget {{
-                background: rgba(255, 255, 255, 0.68);
-                border: 1px solid {CARD_BORDER};
-            }}
-            """
+    def _vdiv(self) -> QWidget:
+        sep = QWidget()
+        sep.setFixedWidth(1)
+        sep.setMinimumHeight(28)
+        sep.setStyleSheet(f"background: {DIVIDER};")
+        return sep
+
+    def _lbl(self, text: str) -> QLabel:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(
+            f"font-size: 11.5px; font-weight: 600; color: {INK_3}; "
+            f"padding: 0 2px;"
         )
-        root = QVBoxLayout(group)
-        root.setContentsMargins(12, 8, 12, 10)
-        root.setSpacing(6)
-
-        title_label = BodyLabel(title)
-        title_label.setStyleSheet(f"font-size: 12px; font-weight: 800; color: {PRIMARY};")
-        root.addWidget(title_label)
-
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        for widget in widgets:
-            row.addWidget(widget)
-        root.addLayout(row)
-        return group
+        return lbl
 
     def _style_control_inputs(self) -> None:
-        input_style = """
-            QComboBox, QSpinBox, QDoubleSpinBox {
-                color: #111827;
-                background: rgba(255, 255, 255, 0.92);
-                border: 1px solid rgba(148, 163, 184, 0.85);
+        input_style = f"""
+            QComboBox, QSpinBox, QDoubleSpinBox {{
+                color: {INK};
+                background: #FFFFFF;
+                border: 1px solid {BORDER};
                 border-radius: 6px;
-                padding: 5px 16px 5px 9px;
-                selection-background-color: #DCEEFF;
-                selection-color: #111827;
-            }
-            QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover {
-                border-color: #0F6CBD;
+                padding: 4px 14px 4px 8px;
+                font-size: 12px;
+                selection-background-color: #F5E0D5;
+                selection-color: {INK};
+                min-height: 22px;
+            }}
+            QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover {{
+                border-color: {RUST};
+            }}
+            QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {{
+                color: {INK_3};
+                background: {SAND};
+            }}
+            QComboBox QAbstractItemView {{
+                color: {INK};
                 background: #FFFFFF;
-            }
-            QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {
-                color: #6B7280;
-                background: rgba(255, 255, 255, 0.70);
-            }
-            QComboBox QAbstractItemView {
-                color: #111827;
-                background: #FFFFFF;
-                border: 1px solid #CBD5E1;
-                selection-background-color: #DCEEFF;
-                selection-color: #111827;
-            }
+                border: 1px solid {BORDER};
+                selection-background-color: #F5E0D5;
+                selection-color: {INK};
+            }}
         """
         for widget in (
             self.tracker_combo,
@@ -221,69 +295,119 @@ class VideoAnalysisPage(Page):
             widget.setStyleSheet(input_style)
 
     def _build_main_panels(self) -> None:
+        # 1) Compact Live Statistics strip
+        self.analytics_panel = self._create_analytics_panel()
+        self.layout.addWidget(self.analytics_panel)
+        self.layout.addSpacing(10)
+
+        # 2) Two video panels, equal width, sized to fit viewport
         grid = QGridLayout()
         grid.setSpacing(14)
 
         self.original_view = ImageViewer("Original Video")
         self.detection_view = ImageViewer("Detection + Tracking Result")
-        self.analytics_panel = self._create_analytics_panel()
+
+        # Right-sized canvas — large enough to read each bbox + class label
+        # but compact enough that the whole page fits one viewport.
+        self.original_view.image_label.setMinimumHeight(360)
+        self.detection_view.image_label.setMinimumHeight(360)
 
         grid.addWidget(self.original_view, 0, 0)
         grid.addWidget(self.detection_view, 0, 1)
-        grid.addWidget(self.analytics_panel, 0, 2)
-        grid.setColumnStretch(0, 2)
-        grid.setColumnStretch(1, 2)
-        grid.setColumnStretch(2, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
         self.layout.addLayout(grid)
 
     def _create_analytics_panel(self) -> QWidget:
+        """Compact horizontal Live Statistics strip — title + status + 9 tiles
+        on a single card. Designed to take < 90 px of vertical space.
+        """
         panel = CardWidget()
-        panel.setBorderRadius(8)
-        panel.setMinimumWidth(300)
+        panel.setBorderRadius(10)
         panel.setStyleSheet(
             f"""
             CardWidget {{
-                background: rgba(255, 255, 255, 0.92);
-                border: 1px solid {CARD_BORDER};
+                background: {SAND};
+                border: 1px solid {BORDER};
             }}
             """
         )
-        root = QVBoxLayout(panel)
-        root.setContentsMargins(18, 16, 18, 16)
-        root.setSpacing(12)
 
-        title = BodyLabel("Live Statistics")
-        title.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {TEXT};")
-        root.addWidget(title)
+        root = QHBoxLayout(panel)
+        root.setContentsMargins(18, 10, 18, 10)
+        root.setSpacing(14)
 
-        self.stat_labels: dict[str, QLabel] = {}
-        for key, label in [
-            ("total", "Total Unique Vehicles"),
-            ("car", "Unique Cars"),
-            ("bus", "Unique Buses"),
-            ("truck", "Unique Trucks"),
-            ("van", "Unique Vans"),
-            ("frame", "Current Frame"),
-            ("fps", "FPS"),
-            ("time", "Processing Time"),
-            ("confidence", "Average Confidence"),
-        ]:
-            row = QHBoxLayout()
-            caption = BodyLabel(label)
-            caption.setStyleSheet(f"color: {SECONDARY_TEXT}; font-size: 13px;")
-            value = QLabel("0")
-            value.setStyleSheet(f"color: {PRIMARY}; font-size: 20px; font-weight: 700;")
-            row.addWidget(caption)
-            row.addStretch(1)
-            row.addWidget(value)
-            root.addLayout(row)
-            self.stat_labels[key] = value
+        # Left column — title + status (vertical, compact)
+        left = QVBoxLayout()
+        left.setContentsMargins(0, 0, 0, 0)
+        left.setSpacing(2)
+
+        title = QLabel("LIVE")
+        title.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; "
+            f"color: {INK}; letter-spacing: 1.6px;"
+        )
+        left.addWidget(title)
 
         self.status_label = BodyLabel("No video loaded")
-        self.status_label.setWordWrap(True)
-        self.status_label.setStyleSheet(f"font-size: 13px; font-weight: 700; color: {SUCCESS};")
-        root.addStretch(1)
-        root.addWidget(self.status_label)
+        self.status_label.setStyleSheet(
+            f"font-size: 11px; font-weight: 600; color: {SAGE};"
+        )
+        self.status_label.setWordWrap(False)
+        self.status_label.setMaximumWidth(150)
+        left.addWidget(self.status_label)
+        root.addLayout(left)
+
+        # Vertical divider between status block and stat tiles
+        root.addWidget(self._vdiv())
+
+        # 9 stat tiles — equal stretch
+        stat_config: list[tuple[str, str, str]] = [
+            ("total",      "TOTAL",   RUST),
+            ("car",        "CARS",    SLATE),
+            ("bus",        "BUSES",   RUST),
+            ("truck",      "TRUCKS",  GOLD),
+            ("van",        "VANS",    SAGE),
+            ("frame",      "FRAME",   INK_3),
+            ("fps",        "FPS",     INK_3),
+            ("time",       "TIME",    INK_3),
+            ("confidence", "CONF",    INK),
+        ]
+
+        self.stat_labels: dict[str, QLabel] = {}
+        for index, (key, label, color) in enumerate(stat_config):
+            if index > 0:
+                inner_sep = QWidget()
+                inner_sep.setFixedWidth(1)
+                inner_sep.setMinimumHeight(36)
+                inner_sep.setStyleSheet(f"background: {DIVIDER};")
+                root.addWidget(inner_sep, 0, Qt.AlignmentFlag.AlignVCenter)
+
+            tile = QWidget()
+            tile_layout = QVBoxLayout(tile)
+            tile_layout.setContentsMargins(6, 2, 6, 2)
+            tile_layout.setSpacing(1)
+
+            caption = QLabel(label)
+            caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            caption.setStyleSheet(
+                f"font-size: 9px; font-weight: 700; "
+                f"color: {TEXT_FAINT}; letter-spacing: 1px;"
+            )
+            tile_layout.addWidget(caption)
+
+            value = QLabel("0")
+            value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            value.setStyleSheet(
+                f"font-family: {FONT_SERIF}; "
+                f"font-size: 19px; font-weight: 700; "
+                f"color: {color}; letter-spacing: -0.4px;"
+            )
+            tile_layout.addWidget(value)
+
+            root.addWidget(tile, 1)
+            self.stat_labels[key] = value
+
         return panel
 
     def _build_timeline(self) -> None:

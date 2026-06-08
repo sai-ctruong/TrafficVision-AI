@@ -14,6 +14,13 @@ from ..models.detection import DetectionSummary, VEHICLE_CLASSES
 from .base import Page
 from ..services.detection_service import VehicleDetectionService
 from ..services.settings_service import SettingsService
+from ..utils.theme import (
+    GOLD_LIGHT,
+    RUST_LIGHT,
+    SAGE_LIGHT,
+    SLATE_LIGHT,
+    VEHICLE_COLORS,
+)
 from ..widgets.image_viewer import ImageViewer
 from ..widgets.metric_card import MetricCard
 
@@ -60,11 +67,11 @@ class VehicleDetectionPage(Page):
         grid = QGridLayout()
         grid.setSpacing(14)
         self.cards = {
-            "car": MetricCard("Car Count", "0", FluentIcon.CAR),
-            "bus": MetricCard("Bus Count", "0", FluentIcon.BUS),
-            "truck": MetricCard("Truck Count", "0", FluentIcon.TRAIN),
-            "van": MetricCard("Van Count", "0", FluentIcon.TAG),
-            "total": MetricCard("Total Vehicles", "0", FluentIcon.SPEED_HIGH),
+            "car":   MetricCard("Cars",           "0", FluentIcon.CAR,        VEHICLE_COLORS["car"],   "CAR",   SLATE_LIGHT),
+            "bus":   MetricCard("Buses",          "0", FluentIcon.BUS,        VEHICLE_COLORS["bus"],   "BUS",   RUST_LIGHT),
+            "truck": MetricCard("Trucks",         "0", FluentIcon.TRAIN,      VEHICLE_COLORS["truck"], "TRUCK", GOLD_LIGHT),
+            "van":   MetricCard("Vans",           "0", FluentIcon.TAG,        VEHICLE_COLORS["van"],   "VAN",   SAGE_LIGHT),
+            "total": MetricCard("Total Vehicles", "0", FluentIcon.SPEED_HIGH, VEHICLE_COLORS["total"], "TOTAL", RUST_LIGHT),
         }
         for index, card in enumerate(self.cards.values()):
             grid.addWidget(card, 0, index)

@@ -1,93 +1,381 @@
-"""Dashboard page."""
+"""Dashboard page — glass cards on an atmospheric depth canvas."""
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QGridLayout, QHBoxLayout, QVBoxLayout
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from qfluentwidgets import BodyLabel, CardWidget, FluentIcon, StrongBodyLabel, SubtitleLabel
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
+)
+from qfluentwidgets import BodyLabel, CardWidget, FluentIcon, IconWidget
 
 from ..models.detection import DetectionSummary, VEHICLE_CLASSES
-from .base import Page
+from ..utils.paths import APP_ROOT, WORKSPACE_ROOT
+from ..utils.theme import (
+    BORDER,
+    FONT_SERIF,
+    GOLD,
+    GOLD_LIGHT,
+    INK,
+    INK_3,
+    RADIUS_LG,
+    RUST,
+    RUST_LIGHT,
+    SAGE,
+    SAGE_LIGHT,
+    SAND,
+    SAND_2,
+    SLATE,
+    SLATE_LIGHT,
+    SUCCESS,
+    TEXT_FAINT,
+    VEHICLE_COLORS,
+    VEHICLE_COLORS_SOFT,
+)
 from ..widgets.metric_card import MetricCard
+from .base import Page
+
+
+def _hex_to_rgb(hex_color: str) -> str:
+    h = hex_color.lstrip("#")
+    return f"{int(h[0:2], 16)}, {int(h[2:4], 16)}, {int(h[4:6], 16)}"
+
+
+def _apply_glass(card: CardWidget, accent: str = RUST, blur: int = 28) -> None:
+    """Make a CardWidget translucent so the depth blobs glow through."""
+    card.setStyleSheet(
+        f"""
+        CardWidget {{
+            background: rgba(255, 251, 244, 0.62);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+        }}
+        CardWidget:hover {{
+            background: rgba(255, 252, 246, 0.72);
+            border: 1px solid rgba({_hex_to_rgb(accent)}, 0.35);
+        }}
+        """
+    )
+    shadow = QGraphicsDropShadowEffect()
+    shadow.setBlurRadius(blur)
+    shadow.setXOffset(0)
+    shadow.setYOffset(6)
+    shadow.setColor(QColor(60, 30, 10, 38))
+    card.setGraphicsEffect(shadow)
+
+
+def _apply_glass_frame(frame: QFrame, blur: int = 24) -> None:
+    """Translucent variant for plain QFrame (no CardWidget selector)."""
+    frame.setStyleSheet(
+        """
+        QFrame {
+            background: rgba(255, 251, 244, 0.55);
+            border: 1.5px dashed rgba(154, 117, 96, 0.55);
+            border-radius: 12px;
+        }
+        """
+    )
+    shadow = QGraphicsDropShadowEffect()
+    shadow.setBlurRadius(blur)
+    shadow.setXOffset(0)
+    shadow.setYOffset(5)
+    shadow.setColor(QColor(60, 30, 10, 30))
+    frame.setGraphicsEffect(shadow)
+
+
+class InfoCard(CardWidget):
+    """Compact card — sand surface, serif title, body text."""
+
+    def __init__(self, title: str, body: str, icon: FluentIcon, accent: str) -> None:
+        super().__init__()
+        self.setBorderRadius(RADIUS_LG)
+        self.setMinimumHeight(120)
+        self.setStyleSheet(
+            f"""
+            CardWidget {{
+                background: {SAND};
+                border: 1px solid {BORDER};
+            }}
+            """
+        )
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 16, 20, 18)
+        layout.setSpacing(10)
+
+        header = QHBoxLayout()
+        header.setSpacing(10)
+
+        chip = QFrame()
+        chip.setFixedSize(26, 26)
+        h = accent.lstrip("#")
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        chip.setStyleSheet(
+            f"""
+            QFrame {{
+                background: rgba({r}, {g}, {b}, 0.14);
+                border-radius: 6px;
+            }}
+            """
+        )
+        chip_layout = QHBoxLayout(chip)
+        chip_layout.setContentsMargins(0, 0, 0, 0)
+        icon_widget = IconWidget(icon)
+        icon_widget.setFixedSize(14, 14)
+        chip_layout.addWidget(icon_widget, 0, Qt.AlignmentFlag.AlignCenter)
+        header.addWidget(chip)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet(
+            f"""
+            font-family: {FONT_SERIF};
+            font-size: 15px;
+            font-weight: 600;
+            color: {INK};
+            """
+        )
+        header.addWidget(title_label, 1, Qt.AlignmentFlag.AlignVCenter)
+        layout.addLayout(header)
+
+        self.body_label = BodyLabel(body)
+        self.body_label.setWordWrap(True)
+        self.body_label.setStyleSheet(
+            f"font-size: 13px; color: {INK_3}; line-height: 1.55;"
+        )
+        layout.addWidget(self.body_label)
+        layout.addStretch(1)
+
+
+class ModelInfoCard(CardWidget):
+    """Right-column model info card — 2-col grid of key/value pairs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setBorderRadius(RADIUS_LG)
+        self.setStyleSheet(
+            f"""
+            CardWidget {{
+                background: {SAND};
+                border: 1px solid {BORDER};
+            }}
+            """
+        )
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # Header strip
+        head = QFrame()
+        head.setStyleSheet(
+            f"background: {SAND_2}; border-bottom: 1px solid {BORDER};"
+        )
+        head_layout = QHBoxLayout(head)
+        head_layout.setContentsMargins(18, 12, 18, 12)
+
+        title = QLabel("Model Info")
+        title.setStyleSheet(f"font-size: 13px; font-weight: 700; color: {INK};")
+        head_layout.addWidget(title)
+        head_layout.addStretch(1)
+
+        live = QLabel("● Online")
+        live.setStyleSheet(f"font-size: 11px; font-weight: 600; color: {SAGE};")
+        head_layout.addWidget(live)
+        root.addWidget(head)
+
+        # Body grid
+        body = QFrame()
+        body_layout = QGridLayout(body)
+        body_layout.setContentsMargins(18, 14, 18, 16)
+        body_layout.setHorizontalSpacing(16)
+        body_layout.setVerticalSpacing(12)
+
+        items = [
+            ("ARCHITECTURE", "YOLO26n", INK),
+            ("SIZE", "5.4 MB", INK),
+            ("mAP@50", "0.981", SAGE),
+            ("PRECISION", "0.955", SAGE),
+            ("RECALL", "0.951", SAGE),
+            ("DEVICE", "Tesla T4", INK),
+        ]
+        for i, (key, val, color) in enumerate(items):
+            key_label = QLabel(key)
+            key_label.setStyleSheet(
+                f"font-size: 10px; color: {TEXT_FAINT}; letter-spacing: 0.5px; font-weight: 600;"
+            )
+            val_label = QLabel(val)
+            val_label.setStyleSheet(
+                f"font-size: 13px; font-weight: 600; color: {color};"
+            )
+            cell = QVBoxLayout()
+            cell.setSpacing(2)
+            cell.addWidget(key_label)
+            cell.addWidget(val_label)
+            body_layout.addLayout(cell, i // 2, i % 2)
+
+        root.addWidget(body)
+
+
+class UploadHintCard(QFrame):
+    """Dashed-border upload hint with icon + label."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setStyleSheet(
+            f"""
+            QFrame {{
+                background: #FBF8F1;
+                border: 1.5px dashed #C4AA96;
+                border-radius: {RADIUS_LG}px;
+            }}
+            """
+        )
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 22, 20, 22)
+        layout.setSpacing(6)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        icon = IconWidget(FluentIcon.CLOUD)
+        icon.setFixedSize(28, 28)
+        layout.addWidget(icon, 0, Qt.AlignmentFlag.AlignCenter)
+
+        title = QLabel("Upload new image or video")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet(f"font-size: 13px; color: {INK_3}; font-weight: 600;")
+        layout.addWidget(title)
+
+        sub = QLabel("JPG, PNG, MP4  ·  Max 50 MB")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub.setStyleSheet(f"font-size: 11px; color: {TEXT_FAINT};")
+        layout.addWidget(sub)
 
 
 class DashboardPage(Page):
-    """Executive overview of traffic detections."""
+    """Executive overview — stat strip + details + right model column."""
 
     def __init__(self) -> None:
         super().__init__("Dashboard", "DashboardPage")
-        self.cards = {
-            "total": MetricCard("Total Vehicles", "0", FluentIcon.SPEED_HIGH),
-            "car": MetricCard("Cars", "0", FluentIcon.CAR),
-            "bus": MetricCard("Buses", "0", FluentIcon.BUS),
-            "truck": MetricCard("Trucks", "0", FluentIcon.TRAIN),
-            "van": MetricCard("Vans", "0", FluentIcon.TAG),
+
+        # Traffic-video background + atmospheric color washes.
+        # Drop a custom file at assets/backgrounds/dashboard.mp4 to override.
+        backgrounds_dir = APP_ROOT / "assets" / "backgrounds"
+        video_candidates = [
+            backgrounds_dir / "dashboard.mp4",
+            backgrounds_dir / "traffic.mp4",
+            WORKSPACE_ROOT / "test_video.mp4",
+        ]
+        self.view.enable_video_background(video_candidates)
+        self.view.depth_blobs = True
+        self.view.update()
+
+        # ---- Stat strip ----------------------------------------------
+        stat_grid = QGridLayout()
+        stat_grid.setSpacing(14)
+
+        card_accents = {
+            "total": (RUST,  "TODAY",    RUST_LIGHT),
+            "car":   (SLATE, "DOMINANT", SLATE_LIGHT),
+            "bus":   (RUST,  "LOW",      RUST_LIGHT),
+            "truck": (GOLD,  "NORMAL",   GOLD_LIGHT),
+            "van":   (SAGE,  "NORMAL",   SAGE_LIGHT),
         }
+        card_titles = {
+            "total": "Total Vehicles", "car": "Cars", "bus": "Buses",
+            "truck": "Trucks", "van": "Vans",
+        }
+        self.cards: dict[str, MetricCard] = {}
+        for index, (key, (accent, badge, bg)) in enumerate(card_accents.items()):
+            card = MetricCard(card_titles[key], "0", None, accent, badge=badge, badge_bg=bg)
+            _apply_glass(card, accent=accent, blur=22)
+            self.cards[key] = card
+            stat_grid.addWidget(card, 0, index)
+        self.layout.addLayout(stat_grid)
+        self.layout.addSpacing(12)
 
-        grid = QGridLayout()
-        grid.setSpacing(20)
-        for index, card in enumerate(self.cards.values()):
-            grid.addWidget(card, index // 5, index % 5)
-        self.layout.addLayout(grid)
-        self.layout.addSpacing(8)
+        # ---- Two-column: details + right column ----------------------
+        two_col = QHBoxLayout()
+        two_col.setSpacing(20)
 
-        panels = QHBoxLayout()
-        panels.setSpacing(20)
-        self.summary = self._info_card("Recent Detection Summary", "No recent detection")
-        self.stats = self._info_card("Quick Statistics", "Cars 0  |  Buses 0  |  Trucks 0  |  Vans 0")
-        self.performance = self._info_card("Performance Metrics", "Processing time 0.00s  |  Average confidence 0%")
-        self.model = self._info_card("Model Information", "YOLO26 model pending")
-        for panel in (self.summary, self.stats, self.performance, self.model):
-            panels.addWidget(panel)
-        self.layout.addLayout(panels)
-        self.layout.addStretch(1)
+        # Left — DETAILS info cards (2x2)
+        left = QVBoxLayout()
+        left.setSpacing(14)
 
-    def _info_card(self, title: str, body: str) -> CardWidget:
-        """Create glassmorphism info card."""
-        card = CardWidget()
-        card.setBorderRadius(14)
-        card.setStyleSheet(
-            """
-            CardWidget {
-                background: rgba(255, 255, 255, 0.85);
-                border: 1px solid rgba(255, 255, 255, 0.4);
-            }
-            """
+        details_grid = QGridLayout()
+        details_grid.setSpacing(14)
+        self.summary = InfoCard(
+            "Recent Detection Summary", "No recent detection",
+            FluentIcon.HISTORY, RUST,
         )
-        
-        # Add shadow
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setXOffset(0)
-        shadow.setYOffset(4)
-        shadow.setColor(QColor(0, 0, 0, 15))
-        card.setGraphicsEffect(shadow)
-        
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(22, 20, 22, 20)
-        layout.setSpacing(10)
-        
-        title_label = SubtitleLabel(title)
-        title_label.setStyleSheet("font-size: 15px; font-weight: 700; color: #1a1a1a;")
-        layout.addWidget(title_label)
-        
-        label = BodyLabel(body)
-        label.setWordWrap(True)
-        label.setStyleSheet("font-size: 13px; color: #6B7280; line-height: 1.6;")
-        card.body_label = label  # type: ignore[attr-defined]
-        layout.addWidget(label)
-        layout.addStretch(1)
-        return card
+        self.stats = InfoCard(
+            "Quick Statistics",
+            "Cars 0  ·  Buses 0  ·  Trucks 0  ·  Vans 0",
+            FluentIcon.PIE_SINGLE, SLATE,
+        )
+        self.performance = InfoCard(
+            "Performance Metrics",
+            "Processing time 0.00s  ·  Average confidence 0%",
+            FluentIcon.SPEED_HIGH, SAGE,
+        )
+        self.model = InfoCard(
+            "Model Information", "YOLO26 model pending",
+            FluentIcon.ROBOT, GOLD,
+        )
+        for info_card, accent in (
+            (self.summary, RUST),
+            (self.stats, SLATE),
+            (self.performance, SAGE),
+            (self.model, GOLD),
+        ):
+            _apply_glass(info_card, accent=accent, blur=32)
+        details_grid.addWidget(self.summary, 0, 0)
+        details_grid.addWidget(self.stats, 0, 1)
+        details_grid.addWidget(self.performance, 1, 0)
+        details_grid.addWidget(self.model, 1, 1)
+        details_grid.setColumnStretch(0, 1)
+        details_grid.setColumnStretch(1, 1)
+        left.addLayout(details_grid)
+        left.addStretch(1)
+        two_col.addLayout(left, 1)
+
+        # Right — model info + upload hint
+        right = QVBoxLayout()
+        right.setSpacing(14)
+        model_info = ModelInfoCard()
+        _apply_glass(model_info, accent=GOLD, blur=32)
+        right.addWidget(model_info)
+
+        upload_hint = UploadHintCard()
+        _apply_glass_frame(upload_hint, blur=24)
+        right.addWidget(upload_hint)
+        right.addStretch(1)
+        right_wrap = QFrame()
+        right_wrap.setFixedWidth(300)
+        right_wrap.setLayout(right)
+        two_col.addWidget(right_wrap)
+
+        self.layout.addLayout(two_col)
+        self.layout.addStretch(1)
 
     def update_summary(self, summary: DetectionSummary, model_name: str) -> None:
         self.cards["total"].set_value(summary.total)
         for key in VEHICLE_CLASSES:
             self.cards[key].set_value(summary.counts.get(key, 0))
-        self.summary.body_label.setText(f"{summary.image_name}: {summary.total} vehicles detected")  # type: ignore[attr-defined]
-        self.stats.body_label.setText(  # type: ignore[attr-defined]
-            "  |  ".join(f"{key.title()} {summary.counts.get(key, 0)}" for key in VEHICLE_CLASSES)
+        self.summary.body_label.setText(
+            f"{summary.image_name}: {summary.total} vehicles detected"
         )
-        self.performance.body_label.setText(  # type: ignore[attr-defined]
-            f"Processing time {summary.processing_time:.2f}s  |  Average confidence {summary.average_confidence:.0%}"
+        self.stats.body_label.setText(
+            "  ·  ".join(
+                f"{key.title()} {summary.counts.get(key, 0)}" for key in VEHICLE_CLASSES
+            )
         )
-        self.model.body_label.setText(f"Active model: {model_name}")  # type: ignore[attr-defined]
+        self.performance.body_label.setText(
+            f"Processing time {summary.processing_time:.2f}s  ·  "
+            f"Average confidence {summary.average_confidence:.0%}"
+        )
+        self.model.body_label.setText(f"Active model: {model_name}")
