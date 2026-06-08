@@ -16,11 +16,12 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import BodyLabel, CardWidget, CheckBox, FluentIcon, InfoBar, InfoBarPosition, PrimaryPushButton, PushButton
+from qfluentwidgets import BodyLabel, CardWidget, CheckBox, FluentIcon, IconWidget, InfoBar, InfoBarPosition, PrimaryPushButton, PushButton
 
 from ..models.detection import DetectionSummary, VEHICLE_CLASSES
 from ..services.detection_service import VehicleDetectionService
@@ -198,7 +199,7 @@ class VideoAnalysisPage(Page):
 
         self.tracker_combo = QComboBox()
         self.tracker_combo.addItems(TRACKER_FILES.keys())
-        self.tracker_combo.setFixedWidth(100)
+        self.tracker_combo.setFixedWidth(118)
         self.tracker_combo.currentTextChanged.connect(lambda _: self._reset_tracking_state())
         row2.addWidget(self._lbl("Tracker"))
         row2.addWidget(self.tracker_combo)
@@ -207,7 +208,7 @@ class VideoAnalysisPage(Page):
         self.confidence_spin.setRange(0.05, 0.95)
         self.confidence_spin.setSingleStep(0.05)
         self.confidence_spin.setValue(DEFAULT_VIDEO_CONFIDENCE)
-        self.confidence_spin.setFixedWidth(76)
+        self.confidence_spin.setFixedWidth(96)
         row2.addWidget(self._lbl("Conf"))
         row2.addWidget(self.confidence_spin)
 
@@ -215,7 +216,7 @@ class VideoAnalysisPage(Page):
         self.iou_spin.setRange(0.10, 0.95)
         self.iou_spin.setSingleStep(0.05)
         self.iou_spin.setValue(0.50)
-        self.iou_spin.setFixedWidth(76)
+        self.iou_spin.setFixedWidth(96)
         row2.addWidget(self._lbl("IOU"))
         row2.addWidget(self.iou_spin)
 
@@ -223,7 +224,7 @@ class VideoAnalysisPage(Page):
 
         self.line_orientation = QComboBox()
         self.line_orientation.addItems(["Horizontal", "Vertical"])
-        self.line_orientation.setFixedWidth(100)
+        self.line_orientation.setFixedWidth(118)
         self.line_orientation.currentTextChanged.connect(self._line_orientation_changed)
         row2.addWidget(self._lbl("Counting Line"))
         row2.addWidget(self.line_orientation)
@@ -232,7 +233,7 @@ class VideoAnalysisPage(Page):
         self.line_position.setRange(0, 9999)
         self.line_position.setValue(0)
         self.line_position.setSuffix(" px")
-        self.line_position.setFixedWidth(88)
+        self.line_position.setFixedWidth(118)
         row2.addWidget(self._lbl("Position"))
         row2.addWidget(self.line_position)
 
@@ -264,7 +265,7 @@ class VideoAnalysisPage(Page):
                 background: #FFFFFF;
                 border: 1px solid {BORDER};
                 border-radius: 6px;
-                padding: 4px 14px 4px 8px;
+                padding: 4px 24px 4px 8px;
                 font-size: 12px;
                 selection-background-color: #F5E0D5;
                 selection-color: {INK};
@@ -309,13 +310,15 @@ class VideoAnalysisPage(Page):
 
         # Right-sized canvas — large enough to read each bbox + class label
         # but compact enough that the whole page fits one viewport.
-        self.original_view.image_label.setMinimumHeight(360)
-        self.detection_view.image_label.setMinimumHeight(360)
+        for view in (self.original_view, self.detection_view):
+            view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            view.image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        grid.addWidget(self.original_view, 0, 0)
-        grid.addWidget(self.detection_view, 0, 1)
+        grid.addWidget(self.original_view, 0, 0, Qt.AlignmentFlag.AlignHCenter)
+        grid.addWidget(self.detection_view, 0, 1, Qt.AlignmentFlag.AlignHCenter)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+        grid.setRowStretch(0, 1)
         self.layout.addLayout(grid)
 
     def _create_analytics_panel(self) -> QWidget:
@@ -362,20 +365,20 @@ class VideoAnalysisPage(Page):
         root.addWidget(self._vdiv())
 
         # 9 stat tiles — equal stretch
-        stat_config: list[tuple[str, str, str]] = [
-            ("total",      "TOTAL",   RUST),
-            ("car",        "CARS",    SLATE),
-            ("bus",        "BUSES",   RUST),
-            ("truck",      "TRUCKS",  GOLD),
-            ("van",        "VANS",    SAGE),
-            ("frame",      "FRAME",   INK_3),
-            ("fps",        "FPS",     INK_3),
-            ("time",       "TIME",    INK_3),
-            ("confidence", "CONF",    INK),
+        stat_config: list[tuple[str, str, str, FluentIcon | None]] = [
+            ("total",      "TOTAL",   RUST,  FluentIcon.SPEED_HIGH),
+            ("car",        "CARS",    SLATE, FluentIcon.CAR),
+            ("bus",        "BUSES",   RUST,  FluentIcon.BUS),
+            ("truck",      "TRUCKS",  GOLD,  FluentIcon.TRAIN),
+            ("van",        "VANS",    SAGE,  FluentIcon.TAG),
+            ("frame",      "FRAME",   INK_3, None),
+            ("fps",        "FPS",     INK_3, None),
+            ("time",       "TIME",    INK_3, None),
+            ("confidence", "CONF",    INK,   None),
         ]
 
         self.stat_labels: dict[str, QLabel] = {}
-        for index, (key, label, color) in enumerate(stat_config):
+        for index, (key, label, color, icon) in enumerate(stat_config):
             if index > 0:
                 inner_sep = QWidget()
                 inner_sep.setFixedWidth(1)
@@ -388,20 +391,31 @@ class VideoAnalysisPage(Page):
             tile_layout.setContentsMargins(6, 2, 6, 2)
             tile_layout.setSpacing(1)
 
+            caption_row = QHBoxLayout()
+            caption_row.setContentsMargins(0, 0, 0, 0)
+            caption_row.setSpacing(4)
+            caption_row.addStretch(1)
+            if icon is not None:
+                icon_widget = IconWidget(icon)
+                icon_widget.setFixedSize(13, 13)
+                icon_widget.setStyleSheet(f"color: {color}; background: transparent;")
+                caption_row.addWidget(icon_widget)
             caption = QLabel(label)
             caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
             caption.setStyleSheet(
                 f"font-size: 9px; font-weight: 700; "
                 f"color: {TEXT_FAINT}; letter-spacing: 1px;"
             )
-            tile_layout.addWidget(caption)
+            caption_row.addWidget(caption)
+            caption_row.addStretch(1)
+            tile_layout.addLayout(caption_row)
 
             value = QLabel("0")
             value.setAlignment(Qt.AlignmentFlag.AlignCenter)
             value.setStyleSheet(
                 f"font-family: {FONT_SERIF}; "
                 f"font-size: 19px; font-weight: 700; "
-                f"color: {color}; letter-spacing: -0.4px;"
+                f"color: {color}; letter-spacing: 0;"
             )
             tile_layout.addWidget(value)
 
@@ -496,7 +510,7 @@ class VideoAnalysisPage(Page):
         self.last_tick = now
 
         self._configure_line_for_frame(frame)
-        self.original_view.set_image(frame)
+        self.original_view.set_image(frame, f"Frame {self.frame_index}/{self.total_frames or '-'}")
 
         yolo_input = self.image_service.enhance(frame) if self.enhance_check.isChecked() else frame
         annotated = yolo_input.copy()
@@ -546,7 +560,7 @@ class VideoAnalysisPage(Page):
 
         if self.line_check.isChecked():
             self._draw_counting_line(annotated)
-        self.detection_view.set_image(annotated)
+        self.detection_view.set_image(annotated, "Detection + tracking overlay")
         self._update_analytics(fps, processing_time, average_confidence)
         self.progress.setValue(self.frame_index)
 

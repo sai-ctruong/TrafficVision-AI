@@ -8,7 +8,6 @@ from qfluentwidgets import (
     BodyLabel,
     FluentIcon,
     IndeterminateProgressRing,
-    PrimaryPushButton,
     PushButton,
     SearchLineEdit,
 )
@@ -20,8 +19,6 @@ from ..utils.theme import (
     INK,
     INK_3,
     PRIMARY,
-    PRIMARY_HOVER,
-    PRIMARY_PRESSED,
     RUST_DIM,
     RUST_LIGHT,
     SAND,
@@ -151,37 +148,10 @@ def _danger_button(icon: FluentIcon, text: str) -> PushButton:
     return btn
 
 
-def _primary_button(icon: FluentIcon, text: str) -> PrimaryPushButton:
-    btn = PrimaryPushButton(icon, text)
-    btn.setFixedHeight(34)
-    btn.setMinimumWidth(156)
-    btn.setCursor(Qt.CursorShape.PointingHandCursor)
-    btn.setStyleSheet(
-        f"""
-        PrimaryPushButton {{
-            background: {PRIMARY};
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 0 16px 0 {_ICON_LEFT_PAD + 2}px;
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 0.1px;
-            text-align: center;
-        }}
-        PrimaryPushButton:hover {{ background: {PRIMARY_HOVER}; }}
-        PrimaryPushButton:pressed {{ background: {PRIMARY_PRESSED}; }}
-        """
-    )
-    return btn
-
-
 class AppHeader(QFrame):
     """60 px cream top bar with eyebrow + search + actions + status pill."""
 
-    load_model_requested = pyqtSignal()
     upload_image_requested = pyqtSignal()
-    run_detection_requested = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -240,17 +210,11 @@ class AppHeader(QFrame):
         actions = QHBoxLayout()
         actions.setSpacing(8)
 
-        self.load_button = _ghost_button(FluentIcon.ROBOT, "Load Model")
         self.upload_button = _ghost_button(FluentIcon.PHOTO, "Upload")
-        self.run_button = _primary_button(FluentIcon.PLAY, "Run Detection")
 
-        self.load_button.clicked.connect(self.load_model_requested)
         self.upload_button.clicked.connect(self.upload_image_requested)
-        self.run_button.clicked.connect(self.run_detection_requested)
 
-        actions.addWidget(self.load_button)
         actions.addWidget(self.upload_button)
-        actions.addWidget(self.run_button)
 
         separator = QWidget()
         separator.setFixedSize(1, 22)

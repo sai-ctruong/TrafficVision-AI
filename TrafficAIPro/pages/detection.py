@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import hashlib
 
 import numpy as np
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QGridLayout, QHBoxLayout
-from qfluentwidgets import FluentIcon, InfoBar, InfoBarPosition, PrimaryPushButton, ProgressRing, PushButton
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QGridLayout
+from qfluentwidgets import FluentIcon, InfoBar, InfoBarPosition
 
 from ..database.history_repository import HistoryRepository
 from ..models.detection import DetectionSummary, VEHICLE_CLASSES
@@ -46,23 +46,15 @@ class VehicleDetectionPage(Page):
         self.history = history
         self.current_image: np.ndarray | None = None
         self.current_name = ""
-
-        actions = QHBoxLayout()
-        self.load_model_button = PushButton(FluentIcon.ROBOT, "Load YOLO26 Model")
-        self.load_model_button.clicked.connect(self.load_model)
-        self.run_button = PrimaryPushButton(FluentIcon.PLAY, "Run Detection")
-        self.run_button.clicked.connect(self.run_detection)
-        self.ring = ProgressRing()
-        self.ring.setFixedSize(34, 34)
-        self.ring.hide()
-        actions.addWidget(self.load_model_button)
-        actions.addWidget(self.run_button)
-        actions.addWidget(self.ring)
-        actions.addStretch(1)
-        self.layout.addLayout(actions)
+        self._pending_signature = ""
+        self._last_detected_signature = ""
+        self._auto_detect_timer = QTimer(self)
+        self._auto_detect_timer.setSingleShot(True)
+        self._auto_detect_timer.setInterval(450)
+        self._auto_detect_timer.timeout.connect(self.run_detection)
 
         self.result_view = ImageViewer("Detection Result")
-        self.layout.addWidget(self.result_view)
+        self.layout.addWidget(self.result_view, 0, Qt.AlignmentFlag.AlignHCenter)
 
         grid = QGridLayout()
         grid.setSpacing(14)
@@ -79,52 +71,49 @@ class VehicleDetectionPage(Page):
         self.layout.addStretch(1)
 
     def set_image(self, image: np.ndarray, image_name: str) -> None:
+        signature = self._image_signature(image, image_name)
+        if signature == self._last_detected_signature:
+            self.result_view.status_label.setText("Latest preview already detected")
+            return
         self.current_image = image
         self.current_name = image_name
+        self._pending_signature = signature
         self.detection_service.reset_inference_state()
-
-    def load_model(self) -> None:
-        path = self.settings.model_path
-        if not Path(path).exists():
-            selected, _ = QFileDialog.getOpenFileName(self, "Select YOLO model", "", "YOLO Weights (*.pt)")
-            if not selected:
-                return
-            path = selected
-            self.settings.model_path = path
-        try:
-            self.detection_service.load_model(path)
-            self.model_status_changed.emit(f"Model loaded: {Path(path).name}")
-            InfoBar.success("Model ready", f"Loaded {Path(path).name}", parent=self, position=InfoBarPosition.TOP_RIGHT)
-        except Exception as exc:
-            InfoBar.error("Model error", str(exc), parent=self, position=InfoBarPosition.TOP_RIGHT)
+        self.result_view.status_label.setText("Waiting for automatic detection...")
+        self._auto_detect_timer.start()
 
     def run_detection(self) -> None:
         if self.current_image is None:
-            InfoBar.warning("No image", "Upload and enhance an image first", parent=self, position=InfoBarPosition.TOP_RIGHT)
             return
         if not self.detection_service.is_loaded:
-            self.load_model()
-            if not self.detection_service.is_loaded:
-                return
-        self.ring.show()
-        self.ring.setValue(0)
+            self.model_status_changed.emit("Model not loaded")
+            return
+        self.model_status_changed.emit("Processing image...")
+        self.result_view.status_label.setText("Running YOLO detection...")
         try:
             annotated, summary = self.detection_service.detect(
                 self.current_image,
                 self.current_name,
                 DEFAULT_DETECTION_CONFIDENCE,
             )
-            self.result_view.set_image(annotated)
+            self.result_view.set_image(annotated, f"{summary.total} vehicles detected")
             self._update_cards(summary)
-            self.history.add(summary)
+            if self._pending_signature != self._last_detected_signature:
+                self.history.add(summary, annotated)
+                self._last_detected_signature = self._pending_signature
             self.detection_completed.emit(summary)
-            InfoBar.success("Detection complete", f"{summary.total} vehicles found", parent=self, position=InfoBarPosition.TOP_RIGHT)
         except Exception as exc:
             InfoBar.error("Detection failed", str(exc), parent=self, position=InfoBarPosition.TOP_RIGHT)
-        finally:
-            self.ring.hide()
 
     def _update_cards(self, summary: DetectionSummary) -> None:
         for key in VEHICLE_CLASSES:
             self.cards[key].set_value(summary.counts.get(key, 0))
         self.cards["total"].set_value(summary.total)
+
+    def _image_signature(self, image: np.ndarray, image_name: str) -> str:
+        contiguous = np.ascontiguousarray(image)
+        digest = hashlib.blake2b(digest_size=16)
+        digest.update(image_name.encode("utf-8", errors="ignore"))
+        digest.update(str(contiguous.shape).encode("ascii"))
+        digest.update(contiguous.data)
+        return digest.hexdigest()

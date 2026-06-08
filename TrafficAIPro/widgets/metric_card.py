@@ -1,21 +1,19 @@
-"""Editorial metric card — sand surface, status badge, big serif number."""
+"""Editorial metric card with a visible vehicle icon."""
 
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout
 from qfluentwidgets import BodyLabel, CardWidget, FluentIcon, IconWidget, StrongBodyLabel
 
 from ..utils.theme import (
     BORDER,
     FONT_SERIF,
-    INK,
     INK_3,
     PRIMARY,
     RADIUS_LG,
     RUST_LIGHT,
     SAND,
-    SECONDARY_TEXT,
 )
 
 
@@ -25,16 +23,7 @@ def _hex_to_rgb(hex_color: str) -> str:
 
 
 class MetricCard(CardWidget):
-    """A KPI tile in the warm-editorial style.
-
-    Layout (matches the v4 mockup):
-        ┌─────────────────────┐
-        │  [BADGE]            │
-        │                     │
-        │  42                 │   ← Fraunces serif, huge
-        │  Total Vehicles     │   ← small uppercase
-        └─────────────────────┘
-    """
+    """A KPI tile for vehicle counts."""
 
     def __init__(
         self,
@@ -48,7 +37,7 @@ class MetricCard(CardWidget):
         super().__init__()
         self.accent = accent
         self.setBorderRadius(RADIUS_LG)
-        self.setMinimumHeight(120)
+        self.setMinimumHeight(132)
         self.setStyleSheet(
             f"""
             CardWidget {{
@@ -65,7 +54,6 @@ class MetricCard(CardWidget):
         root.setContentsMargins(18, 14, 18, 16)
         root.setSpacing(8)
 
-        # Top row: badge + (icon ghost)
         top = QHBoxLayout()
         top.setSpacing(8)
 
@@ -83,9 +71,29 @@ class MetricCard(CardWidget):
         )
         top.addWidget(self.badge_label, 0, Qt.AlignmentFlag.AlignLeft)
         top.addStretch(1)
+
+        if icon is not None:
+            self.icon = IconWidget(icon)
+            self.icon.setFixedSize(30, 30)
+            self.icon.setStyleSheet(
+                f"""
+                IconWidget {{
+                    background: rgba({_hex_to_rgb(accent)}, 0.12);
+                    border-radius: 15px;
+                    padding: 6px;
+                }}
+                """
+            )
+            top.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignRight)
+        else:
+            self.icon = None
+
         root.addLayout(top)
 
-        # Serif value — big editorial number
+        value_row = QHBoxLayout()
+        value_row.setContentsMargins(0, 0, 0, 0)
+        value_row.setSpacing(8)
+
         self.value_label = StrongBodyLabel(str(value))
         self.value_label.setObjectName("MetricValue")
         self.value_label.setStyleSheet(
@@ -94,12 +102,31 @@ class MetricCard(CardWidget):
             font-size: 32px;
             font-weight: 700;
             color: {accent};
-            letter-spacing: -1.2px;
+            letter-spacing: 0;
             """
         )
-        root.addWidget(self.value_label)
+        value_row.addWidget(self.value_label)
+        value_row.addStretch(1)
 
-        # Caption
+        if icon is not None:
+            self.watermark_icon = IconWidget(icon)
+            self.watermark_icon.setFixedSize(44, 44)
+            self.watermark_icon.setStyleSheet(
+                f"""
+                IconWidget {{
+                    background: transparent;
+                    color: rgba({_hex_to_rgb(accent)}, 0.20);
+                }}
+                """
+            )
+            value_row.addWidget(
+                self.watermark_icon,
+                0,
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom,
+            )
+
+        root.addLayout(value_row)
+
         self.title_label = BodyLabel(title)
         self.title_label.setStyleSheet(
             f"""

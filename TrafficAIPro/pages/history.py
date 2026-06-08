@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QTableWidgetItem
+from pathlib import Path
+
+import cv2
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QFileDialog, QAbstractItemView, QHBoxLayout, QTableWidgetItem
 from qfluentwidgets import ComboBox, FluentIcon, InfoBar, InfoBarPosition, PushButton, SearchLineEdit, TableWidget
 
 from ..database.history_repository import HistoryRepository
 from .base import Page
 from ..utils.paths import EXPORT_DIR
+from ..widgets.image_viewer import ImageViewer
 
 
 class HistoryPage(Page):
@@ -16,6 +21,7 @@ class HistoryPage(Page):
     def __init__(self, history: HistoryRepository) -> None:
         super().__init__("History", "HistoryPage")
         self.history = history
+        self._row_image_paths: dict[int, str] = {}
 
         toolbar = QHBoxLayout()
         self.search = SearchLineEdit()
@@ -41,13 +47,27 @@ class HistoryPage(Page):
         )
         self.table.verticalHeader().hide()
         self.table.setAlternatingRowColors(True)
-        self.layout.addWidget(self.table, 1)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.currentCellChanged.connect(self.show_selected_preview)
+
+        self.preview = ImageViewer("Detected Image")
+        self.preview.clear("Select a history row", "No history selected")
+
+        content = QHBoxLayout()
+        content.setSpacing(20)
+        content.addWidget(self.table, 1)
+        content.addWidget(self.preview, 0, Qt.AlignmentFlag.AlignTop)
+        self.layout.addLayout(content, 1)
         self.refresh()
 
     def refresh(self) -> None:
         rows = self.history.list(self.search.text(), self.sort.currentText())
+        self._row_image_paths.clear()
         self.table.setRowCount(len(rows))
         for row_index, row in enumerate(rows):
+            result_image_path = row["result_image_path"] if "result_image_path" in row.keys() else ""
+            self._row_image_paths[row_index] = result_image_path or ""
             values = [
                 row["id"],
                 row["image_name"],
@@ -62,6 +82,33 @@ class HistoryPage(Page):
             for col, value in enumerate(values):
                 self.table.setItem(row_index, col, QTableWidgetItem(str(value)))
         self.table.resizeColumnsToContents()
+        if rows:
+            self.table.selectRow(0)
+            self.show_selected_preview(0, 0, -1, -1)
+        else:
+            self.preview.clear("No history records", "Run detection to create history")
+
+    def show_selected_preview(self, current_row: int, *_args: object) -> None:
+        if current_row < 0:
+            self.preview.clear("Select a history row", "No history selected")
+            return
+
+        image_path = self._row_image_paths.get(current_row, "")
+        if not image_path:
+            self.preview.clear("No saved image", "This older record has no detected image")
+            return
+
+        path = Path(image_path)
+        if not path.exists():
+            self.preview.clear("Image file missing", path.name)
+            return
+
+        image = cv2.imread(str(path))
+        if image is None:
+            self.preview.clear("Unable to load image", path.name)
+            return
+
+        self.preview.set_image(image, path.name)
 
     def delete_selected(self) -> None:
         rows = {item.row() for item in self.table.selectedItems()}

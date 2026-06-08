@@ -203,7 +203,7 @@ class SidebarFooter(QFrame):
         # Quota label row
         quota_row = QHBoxLayout()
         quota_row.setContentsMargins(0, 0, 0, 0)
-        key = QLabel("Model Status")
+        key = QLabel("Model")
         key.setStyleSheet(
             "font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 0.3px;"
         )
@@ -235,7 +235,7 @@ class SidebarFooter(QFrame):
         user_row.setContentsMargins(0, 0, 0, 0)
         user_row.setSpacing(10)
 
-        avatar = QLabel("TN")
+        avatar = QLabel("AI")
         avatar.setFixedSize(28, 28)
         avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
         avatar.setStyleSheet(
@@ -249,7 +249,7 @@ class SidebarFooter(QFrame):
         )
         user_row.addWidget(avatar)
 
-        self.user_label = QLabel("trinhnhatanh")
+        self.user_label = QLabel("Local workspace")
         self.user_label.setStyleSheet(
             "font-size: 12px; color: rgba(255,255,255,0.55); font-weight: 500;"
         )

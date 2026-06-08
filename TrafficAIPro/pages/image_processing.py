@@ -160,7 +160,7 @@ class ImageProcessingPage(Page):
         self.reset_button.clicked.connect(self.reset_controls)
         actions.addWidget(self.reset_button)
         
-        self.apply_button = PushButton("Apply & Continue")
+        self.apply_button = PushButton("View Detection")
         self.apply_button.setIcon(FluentIcon.ACCEPT)
         self.apply_button.setFixedHeight(44)
         self.apply_button.setMinimumWidth(140)
@@ -177,8 +177,10 @@ class ImageProcessingPage(Page):
         preview_grid.setSpacing(20)
         self.original_view = ImageViewer("Original Image")
         self.enhanced_view = ImageViewer("Enhanced Preview")
-        preview_grid.addWidget(self.original_view, 0, 0)
-        preview_grid.addWidget(self.enhanced_view, 0, 1)
+        preview_grid.addWidget(self.original_view, 0, 0, Qt.AlignmentFlag.AlignHCenter)
+        preview_grid.addWidget(self.enhanced_view, 0, 1, Qt.AlignmentFlag.AlignHCenter)
+        preview_grid.setColumnStretch(0, 1)
+        preview_grid.setColumnStretch(1, 1)
         self.layout.addLayout(preview_grid)
         self.layout.addSpacing(8)
 
@@ -278,11 +280,11 @@ class ImageProcessingPage(Page):
         
         self.image_path = path
         self.original_image = self.image_service.load(path)
-        self.original_view.set_image(self.original_image)
         
         # Update info
         filename = Path(path).name
         height, width = self.original_image.shape[:2]
+        self.original_view.set_image(self.original_image, f"{filename} - {width} x {height}px")
         self.image_info.setText(
             f"File: {filename}\n"
             f"Size: {width} × {height} px\n"
@@ -307,7 +309,7 @@ class ImageProcessingPage(Page):
             contrast=self.contrast_slider.value() / 10,
             median_kernel=self.median_slider.value(),
         )
-        self.enhanced_view.set_image(self.enhanced_image)
+        self.enhanced_view.set_image(self.enhanced_image, f"Enhanced preview - {Path(self.image_path).name}")
         self.image_changed.emit(self.enhanced_image, Path(self.image_path).name)
         
         self.status_label.setText("● Preview Updated")
@@ -340,9 +342,6 @@ class ImageProcessingPage(Page):
             duration=2000,
             parent=self
         )
-        
-        # Emit signal with enhanced image
-        self.image_changed.emit(self.enhanced_image, Path(self.image_path).name)
         
         # Switch to detection page
         # Find parent window and switch page

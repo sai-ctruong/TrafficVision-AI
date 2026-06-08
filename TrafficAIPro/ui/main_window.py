@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize
+from PyQt6.QtCore import QSize, QTimer
 from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 from qfluentwidgets import Theme, setTheme
 
@@ -105,13 +105,12 @@ class TrafficAIWindow(QMainWindow):
         self.setStyleSheet(
             f"QMainWindow {{ background: {APP_BACKGROUND}; }}" + app_style_sheet()
         )
+        QTimer.singleShot(0, self._auto_load_model)
 
     def _connect_signals(self) -> None:
         """Connect all signal handlers."""
         # Header actions
-        self.header.load_model_requested.connect(self._handle_load_model)
         self.header.upload_image_requested.connect(self._handle_upload_image)
-        self.header.run_detection_requested.connect(self._handle_run_detection)
         
         # Sidebar navigation
         self.sidebar.page_requested.connect(self.show_page)
@@ -137,20 +136,20 @@ class TrafficAIWindow(QMainWindow):
             if hasattr(self.header, "set_eyebrow"):
                 self.header.set_eyebrow(eyebrow_map.get(key, "Workspace"))
 
-    def _handle_load_model(self) -> None:
-        """Handle load model button click."""
-        self.show_page("detection")
-        # The detection page has its own load model button
-
     def _handle_upload_image(self) -> None:
         """Handle upload image button click."""
         self.show_page("processing")
         # The processing page has its own upload button
 
-    def _handle_run_detection(self) -> None:
-        """Handle run detection button click."""
-        self.show_page("detection")
-        # The detection page can run detection
+    def _auto_load_model(self) -> None:
+        """Load the configured YOLO model once when the application starts."""
+        self._update_model_status("Loading model...")
+        try:
+            self.detection_service.load_model(self.settings_service.model_path)
+        except Exception as exc:
+            self._update_model_status(f"Model error: {exc}")
+            return
+        self._update_model_status(f"Model loaded: {self.detection_service.model_name}")
 
     def _handle_detection_complete(self, summary) -> None:
         """Update UI after detection completes."""
@@ -159,8 +158,7 @@ class TrafficAIWindow(QMainWindow):
         self._update_enhancement_analytics(summary)
         self.history.refresh()
         
-        # Update header status
-        self.header.set_status(self.detection_service.model_name, "loaded")
+        self._update_model_status(f"Model loaded: {self.detection_service.model_name}")
 
     def _update_enhancement_analytics(self, enhanced_summary) -> None:
         """Update original vs enhanced analytics without storing duplicate history."""
