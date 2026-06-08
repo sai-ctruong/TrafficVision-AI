@@ -1,80 +1,115 @@
-"""Premium glassmorphism metric cards."""
+"""Editorial metric card — sand surface, status badge, big serif number."""
 
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QHBoxLayout, QVBoxLayout
-from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout
 from qfluentwidgets import BodyLabel, CardWidget, FluentIcon, IconWidget, StrongBodyLabel
 
-from ..utils.theme import PRIMARY, SECONDARY_TEXT
+from ..utils.theme import (
+    BORDER,
+    FONT_SERIF,
+    INK,
+    INK_3,
+    PRIMARY,
+    RADIUS_LG,
+    RUST_LIGHT,
+    SAND,
+    SECONDARY_TEXT,
+)
+
+
+def _hex_to_rgb(hex_color: str) -> str:
+    h = hex_color.lstrip("#")
+    return f"{int(h[0:2], 16)}, {int(h[2:4], 16)}, {int(h[4:6], 16)}"
 
 
 class MetricCard(CardWidget):
-    """Premium glassmorphism card with icon, value and caption."""
+    """A KPI tile in the warm-editorial style.
 
-    def __init__(self, title: str, value: str = "0", icon: FluentIcon | None = None) -> None:
+    Layout (matches the v4 mockup):
+        ┌─────────────────────┐
+        │  [BADGE]            │
+        │                     │
+        │  42                 │   ← Fraunces serif, huge
+        │  Total Vehicles     │   ← small uppercase
+        └─────────────────────┘
+    """
+
+    def __init__(
+        self,
+        title: str,
+        value: str = "0",
+        icon: FluentIcon | None = None,
+        accent: str = PRIMARY,
+        badge: str = "",
+        badge_bg: str = RUST_LIGHT,
+    ) -> None:
         super().__init__()
-        self.setBorderRadius(14)
-        self.setMinimumHeight(130)
-        
-        # Glassmorphism style
+        self.accent = accent
+        self.setBorderRadius(RADIUS_LG)
+        self.setMinimumHeight(120)
         self.setStyleSheet(
-            """
-            CardWidget {
-                background: rgba(255, 255, 255, 0.85);
-                border: 1px solid rgba(255, 255, 255, 0.4);
-            }
+            f"""
+            CardWidget {{
+                background: {SAND};
+                border: 1px solid {BORDER};
+            }}
+            CardWidget:hover {{
+                border: 1px solid rgba({_hex_to_rgb(accent)}, 0.35);
+            }}
             """
         )
-        
-        # Add soft shadow
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setXOffset(0)
-        shadow.setYOffset(4)
-        shadow.setColor(QColor(0, 0, 0, 15))
-        self.setGraphicsEffect(shadow)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(22, 20, 22, 20)
-        root.setSpacing(12)
+        root.setContentsMargins(18, 14, 18, 16)
+        root.setSpacing(8)
 
-        # Top row: icon and title
-        top_row = QHBoxLayout()
-        top_row.setSpacing(12)
+        # Top row: badge + (icon ghost)
+        top = QHBoxLayout()
+        top.setSpacing(8)
 
-        self.icon = IconWidget(icon or FluentIcon.CAR)
-        self.icon.setFixedSize(36, 36)
-        top_row.addWidget(self.icon)
-
-        self.title_label = BodyLabel(title)
-        self.title_label.setStyleSheet(
+        self.badge_label = BodyLabel(badge or title.upper())
+        self.badge_label.setStyleSheet(
             f"""
-            font-size: 14px;
-            font-weight: 600;
-            color: {SECONDARY_TEXT};
+            background: {badge_bg};
+            color: {accent};
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 10px;
+            letter-spacing: 0.4px;
             """
         )
-        top_row.addWidget(self.title_label, 1)
+        top.addWidget(self.badge_label, 0, Qt.AlignmentFlag.AlignLeft)
+        top.addStretch(1)
+        root.addLayout(top)
 
-        root.addLayout(top_row)
-        root.addSpacing(4)
-
-        # Large number value
-        self.value_label = StrongBodyLabel(value)
+        # Serif value — big editorial number
+        self.value_label = StrongBodyLabel(str(value))
         self.value_label.setObjectName("MetricValue")
         self.value_label.setStyleSheet(
             f"""
-            font-size: 42px;
+            font-family: {FONT_SERIF};
+            font-size: 32px;
             font-weight: 700;
-            color: {PRIMARY};
-            letter-spacing: -1px;
+            color: {accent};
+            letter-spacing: -1.2px;
             """
         )
         root.addWidget(self.value_label)
+
+        # Caption
+        self.title_label = BodyLabel(title)
+        self.title_label.setStyleSheet(
+            f"""
+            font-size: 11.5px;
+            font-weight: 500;
+            color: {INK_3};
+            """
+        )
+        root.addWidget(self.title_label)
         root.addStretch(1)
 
     def set_value(self, value: int | float | str) -> None:
         self.value_label.setText(str(value))
-

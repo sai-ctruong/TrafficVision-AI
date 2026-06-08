@@ -98,9 +98,9 @@ class AnalyticsImagePanel(CardWidget):
         self.image_label.setStyleSheet(
             """
             QLabel {
-                background: rgba(15, 108, 189, 0.08);
+                background: rgba(196, 81, 42, 0.06);
                 border-radius: 8px;
-                color: #7A869A;
+                color: #9A7560;
                 font-size: 13px;
                 font-weight: 600;
             }
@@ -240,7 +240,7 @@ class KpiCard(CardWidget):
         self.progress.setStyleSheet(
             f"""
             QProgressBar {{
-                background: rgba(15, 108, 189, 0.10);
+                background: rgba(196, 81, 42, 0.10);
                 border: none;
                 border-radius: 4px;
             }}
@@ -265,8 +265,8 @@ class StoryStep(QFrame):
         self.setStyleSheet(
             """
             QFrame {
-                background: rgba(15, 108, 189, 0.08);
-                border: 1px solid rgba(15, 108, 189, 0.16);
+                background: rgba(196, 81, 42, 0.07);
+                border: 1px solid rgba(196, 81, 42, 0.18);
                 border-radius: 12px;
             }
             """
@@ -290,9 +290,6 @@ class AnalyticsPage(Page):
 
     def __init__(self) -> None:
         super().__init__("Analytics", "AnalyticsPage")
-        self.view.background.hide()
-        self.view.overlay.hide()
-        self.view.setStyleSheet("#PageView { background: #F3F6FA; }")
 
         self.pie = PieChartWidget()
         self.bar = VehicleBarChartWidget()
