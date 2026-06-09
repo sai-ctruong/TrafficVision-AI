@@ -350,6 +350,15 @@ class DashboardPage(Page):
         _apply_glass(model_info, accent=GOLD, blur=32)
         right.addWidget(model_info)
 
+        self.hardware = InfoCard(
+            "Hardware Status",
+            self._hardware_status_text("Mock", "Green", "None"),
+            FluentIcon.ROBOT,
+            SAGE,
+        )
+        _apply_glass(self.hardware, accent=SAGE, blur=28)
+        right.addWidget(self.hardware)
+
         upload_hint = UploadHintCard()
         _apply_glass_frame(upload_hint, blur=24)
         right.addWidget(upload_hint)
@@ -379,3 +388,21 @@ class DashboardPage(Page):
             f"Average confidence {summary.average_confidence:.0%}"
         )
         self.model.body_label.setText(f"Active model: {model_name}")
+
+    def update_hardware_status(self, mode: str, traffic_light: str, last_sent_data: str) -> None:
+        """Update optional Arduino integration status."""
+        mode_text = "Connected" if mode == "Connected" else "Mock"
+        traffic_text = {"G": "Green", "Y": "Yellow", "R": "Red"}.get(
+            traffic_light,
+            traffic_light if traffic_light in {"Green", "Yellow", "Red"} else "Green",
+        )
+        self.hardware.body_label.setText(
+            self._hardware_status_text(mode_text, traffic_text, last_sent_data or "None")
+        )
+
+    def _hardware_status_text(self, mode: str, traffic_light: str, last_sent_data: str) -> str:
+        return (
+            f"Arduino Mode: {mode}\n"
+            f"Traffic Light: {traffic_light}\n"
+            f"Last Sent Data: {last_sent_data}"
+        )

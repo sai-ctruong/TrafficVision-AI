@@ -15,11 +15,16 @@ from ..pages.image_processing import ImageProcessingPage
 from ..pages.project_information import ProjectInformationPage
 from ..pages.video_analysis import VideoAnalysisPage
 from ..services.detection_service import VehicleDetectionService
+from ..services.arduino_service import ArduinoService
 from ..services.image_service import ImageEnhancementService
 from ..services.settings_service import SettingsService
 from ..utils.theme import APP_BACKGROUND, app_style_sheet
 from ..widgets.app_header import AppHeader
 from ..widgets.sidebar import Sidebar
+
+
+ARDUINO_MOCK_MODE = True
+ARDUINO_PORT = None  # Example real port: "COM3"
 
 
 class TrafficAIWindow(QMainWindow):
@@ -33,6 +38,11 @@ class TrafficAIWindow(QMainWindow):
         setTheme(self.settings_service.theme)
         self.image_service = ImageEnhancementService()
         self.detection_service = VehicleDetectionService(self.settings_service.model_path)
+        self.arduino_service = ArduinoService(
+            mock_mode=ARDUINO_MOCK_MODE,
+            port=ARDUINO_PORT,
+        )
+        self.arduino_service.connect()
         self.history_repository = HistoryRepository()
 
         # Window setup
@@ -66,6 +76,7 @@ class TrafficAIWindow(QMainWindow):
         
         # Initialize pages
         self.dashboard = DashboardPage()
+        self._update_hardware_status()
         self.processing = ImageProcessingPage(self.image_service)
         self.detection = VehicleDetectionPage(
             self.detection_service,
@@ -158,6 +169,7 @@ class TrafficAIWindow(QMainWindow):
     def _handle_detection_complete(self, summary) -> None:
         """Update UI after detection completes."""
         self.dashboard.update_summary(summary, self.detection_service.model_name)
+        self._send_vehicle_count_to_arduino(summary)
         self.analytics.add_summary(summary)
         self._update_enhancement_analytics(summary)
         self.history.refresh()
@@ -216,6 +228,27 @@ class TrafficAIWindow(QMainWindow):
         }
         self.sidebar.set_status(text, sidebar_palette.get(state, "#9A7560"))
 
+    def _send_vehicle_count_to_arduino(self, summary) -> None:
+        """Send the latest detection counts to the optional Arduino service."""
+        try:
+            self.arduino_service.send_vehicle_count(
+                summary.counts.get("car", 0),
+                summary.counts.get("bus", 0),
+                summary.counts.get("truck", 0),
+                summary.counts.get("van", 0),
+            )
+        except Exception as exc:
+            print(f"[ArduinoService] Vehicle count send skipped: {exc}")
+        finally:
+            self._update_hardware_status()
+
+    def _update_hardware_status(self) -> None:
+        self.dashboard.update_hardware_status(
+            self.arduino_service.mode_label,
+            self.arduino_service.traffic_light_label,
+            self.arduino_service.last_sent_data,
+        )
+
     def _toggle_theme(self, dark: bool) -> None:
         """Toggle between light and dark theme."""
         theme = Theme.DARK if dark else Theme.LIGHT
@@ -227,3 +260,7 @@ class TrafficAIWindow(QMainWindow):
         self.detection_service.model_path = path
         filename = path.split('/')[-1] if '/' in path else path.split('\\')[-1]
         self.header.set_status(f"Selected: {filename}", "processing")
+
+    def closeEvent(self, event) -> None:
+        self.arduino_service.disconnect()
+        super().closeEvent(event)
