@@ -34,6 +34,7 @@ PAGE_DESCRIPTIONS: dict[str, str] = {
     "Video Analysis": "Detect, track, and count vehicles crossing a counting line.",
     "Analytics": "Compare original vs. enhanced detections at a glance.",
     "History": "Searchable record of every detection run.",
+    "Project Information": "A polished overview of the TrafficVision AI project, team, and architecture.",
     "Settings": "Theme, model weights, and confidence preferences.",
 }
 

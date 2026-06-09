@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
 from qfluentwidgets import BodyLabel, FluentIcon, IconWidget
 
 from ..utils.theme import (
-    BROWN_2,
     CREAM,
     FONT_SERIF,
     RUST,
@@ -181,82 +180,6 @@ class BrandHeader(QWidget):
         layout.addWidget(pill)
 
 
-class SidebarFooter(QFrame):
-    """Footer with a small quota track + avatar tile."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.setObjectName("SidebarFooter")
-        self.setStyleSheet(
-            f"""
-            #SidebarFooter {{
-                background: transparent;
-                border-top: 1px solid {SIDEBAR_BORDER};
-            }}
-            """
-        )
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 16, 24, 18)
-        layout.setSpacing(8)
-
-        # Quota label row
-        quota_row = QHBoxLayout()
-        quota_row.setContentsMargins(0, 0, 0, 0)
-        key = QLabel("Model")
-        key.setStyleSheet(
-            "font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 0.3px;"
-        )
-        quota_row.addWidget(key)
-        quota_row.addStretch(1)
-        self.quota_val = QLabel("Ready")
-        self.quota_val.setStyleSheet(
-            "font-size: 10px; color: rgba(255,255,255,0.55); font-weight: 600;"
-        )
-        quota_row.addWidget(self.quota_val)
-        layout.addLayout(quota_row)
-
-        # Quota progress bar
-        track = QFrame()
-        track.setFixedHeight(2)
-        track.setStyleSheet("background: rgba(255,255,255,0.10); border-radius: 1px;")
-        track_layout = QHBoxLayout(track)
-        track_layout.setContentsMargins(0, 0, 0, 0)
-        track_layout.setSpacing(0)
-        self.quota_fill = QFrame()
-        self.quota_fill.setStyleSheet(f"background: {RUST}; border-radius: 1px;")
-        track_layout.addWidget(self.quota_fill, 65)
-        track_layout.addWidget(QFrame(), 35)
-        layout.addWidget(track)
-
-        # User row
-        layout.addSpacing(6)
-        user_row = QHBoxLayout()
-        user_row.setContentsMargins(0, 0, 0, 0)
-        user_row.setSpacing(10)
-
-        avatar = QLabel("AI")
-        avatar.setFixedSize(28, 28)
-        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        avatar.setStyleSheet(
-            f"""
-            background: {BROWN_2};
-            color: {CREAM};
-            font-size: 11px;
-            font-weight: 700;
-            border-radius: 14px;
-            """
-        )
-        user_row.addWidget(avatar)
-
-        self.user_label = QLabel("Local workspace")
-        self.user_label.setStyleSheet(
-            "font-size: 12px; color: rgba(255,255,255,0.55); font-weight: 500;"
-        )
-        user_row.addWidget(self.user_label, 1)
-        layout.addLayout(user_row)
-
-
 class Sidebar(QFrame):
     """Dark-brown editorial sidebar (256 px)."""
 
@@ -303,6 +226,7 @@ class Sidebar(QFrame):
                 [
                     ("analytics", "Analytics", FluentIcon.PIE_SINGLE),
                     ("history", "History", FluentIcon.HISTORY),
+                    ("project_information", "Project Information", FluentIcon.INFO),
                 ],
             ),
         ]
@@ -318,9 +242,6 @@ class Sidebar(QFrame):
 
         root.addStretch(1)
 
-        self.footer = SidebarFooter()
-        root.addWidget(self.footer)
-
         self.set_current("dashboard")
 
     def set_current(self, key: str) -> None:
@@ -328,7 +249,6 @@ class Sidebar(QFrame):
             item.set_selected(item_key == key)
 
     def set_status(self, text: str, color: str = SAGE) -> None:
-        """Update the live model pill + footer."""
+        """Update the live model pill."""
         self.brand.pill_text.setText(text)
         self.brand.led.setStyleSheet(f"background: {color}; border-radius: 3px;")
-        self.footer.quota_val.setText(text if len(text) < 22 else "Updated")
