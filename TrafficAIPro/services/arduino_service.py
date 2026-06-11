@@ -106,9 +106,12 @@ class ArduinoService:
             return False
 
     def disconnect(self) -> None:
-        """Close the serial connection if one is open."""
         if self.is_connected:
             try:
+                self._serial.write(b"OFF\n")
+                self._serial.flush()
+                time.sleep(0.2)
+
                 self._serial.close()
                 print("[ArduinoService] Arduino serial connection closed.")
             except Exception as exc:
@@ -191,3 +194,5 @@ class ArduinoService:
             return max(0, int(value))
         except (TypeError, ValueError):
             return 0
+    
+    
