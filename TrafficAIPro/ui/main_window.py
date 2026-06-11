@@ -23,8 +23,8 @@ from ..widgets.app_header import AppHeader
 from ..widgets.sidebar import Sidebar
 
 
-ARDUINO_MOCK_MODE = True
-ARDUINO_PORT = None  # Example real port: "COM3"
+ARDUINO_MOCK_MODE = False
+ARDUINO_PORT = "COM3"  # Example real port: "COM3"
 
 
 class TrafficAIWindow(QMainWindow):
