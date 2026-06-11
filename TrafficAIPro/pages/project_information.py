@@ -373,7 +373,7 @@ class AcademicFactsStrip(QWidget):
             ),
             (
                 "University",
-                "Ho Chi Minh City University of Technology and Education (HCMUTE)",
+                "Ho Chi Minh City University of Technology and Engineering (HCMUTE)",
                 FluentIcon.HOME,
                 SLATE,
                 SLATE_LIGHT,
@@ -834,7 +834,7 @@ class FooterCard(CardWidget):
         layout.addWidget(icon)
 
         text = BodyLabel(
-            "TrafficVision AI  |  Ho Chi Minh City University of Technology and Education  |  "
+            "TrafficVision AI  |  Ho Chi Minh City University of Technology and Engineering  |  "
             "Academic Year 2025-2026"
         )
         text.setWordWrap(True)

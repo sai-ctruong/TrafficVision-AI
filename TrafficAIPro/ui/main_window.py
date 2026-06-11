@@ -12,7 +12,6 @@ from ..pages.dashboard import DashboardPage
 from ..pages.detection import VehicleDetectionPage
 from ..pages.history import HistoryPage
 from ..pages.image_processing import ImageProcessingPage
-from ..pages.project_information import ProjectInformationPage
 from ..pages.video_analysis import VideoAnalysisPage
 from ..services.detection_service import VehicleDetectionService
 from ..services.arduino_service import ArduinoService
@@ -90,7 +89,6 @@ class TrafficAIWindow(QMainWindow):
         )
         self.analytics = AnalyticsPage()
         self.history = HistoryPage(self.history_repository)
-        self.project_information = ProjectInformationPage()
 
         # Add pages to stack
         self.pages_map = {
@@ -100,7 +98,6 @@ class TrafficAIWindow(QMainWindow):
             "video": self.video,
             "analytics": self.analytics,
             "history": self.history,
-            "project_information": self.project_information,
         }
         
         for page in self.pages_map.values():
@@ -146,7 +143,6 @@ class TrafficAIWindow(QMainWindow):
                 "video": "Live Tracking",
                 "analytics": "Reports",
                 "history": "Detection History",
-                "project_information": "Project Information",
             }
             if hasattr(self.header, "set_eyebrow"):
                 self.header.set_eyebrow(eyebrow_map.get(key, "Workspace"))

@@ -22,7 +22,7 @@
 
 ## Tổng Quan
 
-TrafficVision AI được xây dựng cho môn **Digital Image Processing** tại **Ho Chi Minh City University of Technology and Education (HCMUTE)**, năm học **2025-2026**. Project tập trung vào một pipeline hoàn chỉnh:
+TrafficVision AI được xây dựng cho môn **Digital Image Processing** tại **Ho Chi Minh City University of Technology and Engineering (HCMUTE)**, năm học **2025-2026**. Project tập trung vào một pipeline hoàn chỉnh:
 
 ```text
 Image / Video

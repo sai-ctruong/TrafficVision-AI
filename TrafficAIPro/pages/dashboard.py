@@ -40,6 +40,15 @@ from ..utils.theme import (
 )
 from ..widgets.metric_card import MetricCard
 from .base import Page
+from .project_information import (
+    AcademicFactsStrip,
+    ArchitectureStep,
+    FooterCard,
+    HeroBanner,
+    MemberCard,
+    SectionTitle as ProjectSectionTitle,
+    _soft_shadow as _project_soft_shadow,
+)
 
 
 def _hex_to_rgb(hex_color: str) -> str:
@@ -257,10 +266,10 @@ class UploadHintCard(QFrame):
 
 
 class DashboardPage(Page):
-    """Executive overview — stat strip + details + right model column."""
+    """Project landing information followed by the operational dashboard."""
 
     def __init__(self) -> None:
-        super().__init__("Dashboard", "DashboardPage")
+        super().__init__("Project Information", "DashboardPage")
 
         # Traffic-video background + atmospheric color washes.
         # Drop a custom file at assets/backgrounds/dashboard.mp4 to override.
@@ -273,6 +282,9 @@ class DashboardPage(Page):
         self.view.enable_video_background(video_candidates)
         self.view.depth_blobs = True
         self.view.update()
+
+        self._add_project_information()
+        self.layout.addWidget(ProjectSectionTitle("Dashboard", "Detection Dashboard"))
 
         # ---- Stat strip ----------------------------------------------
         stat_grid = QGridLayout()
@@ -369,7 +381,66 @@ class DashboardPage(Page):
         two_col.addWidget(right_wrap)
 
         self.layout.addLayout(two_col)
+        self.layout.addWidget(FooterCard())
         self.layout.addStretch(1)
+
+    def _add_project_information(self) -> None:
+        self.layout.setSpacing(22)
+        self.layout.addWidget(HeroBanner())
+        self.layout.addWidget(AcademicFactsStrip())
+
+        self.layout.addWidget(ProjectSectionTitle("Team", "Team Members"))
+        team_grid = QGridLayout()
+        team_grid.setSpacing(14)
+        members = [
+            ("Trịnh Nhật Anh", "23110074", "NA", RUST, RUST_LIGHT),
+            ("Phạm Công Trường", "23110163", "CT", SLATE, SLATE_LIGHT),
+            ("Trần Minh Huy", "23110106", "MH", SAGE, SAGE_LIGHT),
+        ]
+        for index, member in enumerate(members):
+            team_grid.addWidget(MemberCard(*member), 0, index)
+            team_grid.setColumnStretch(index, 1)
+        self.layout.addLayout(team_grid)
+
+        self.layout.addWidget(ProjectSectionTitle("Architecture", "System Architecture"))
+        self.layout.addWidget(self._build_architecture_flow())
+
+    def _build_architecture_flow(self) -> CardWidget:
+        flow_card = CardWidget()
+        flow_card.setBorderRadius(RADIUS_LG)
+        flow_card.setStyleSheet(
+            """
+            CardWidget {
+                background: rgba(255, 251, 244, 0.72);
+                border: 1px solid rgba(255, 255, 255, 0.68);
+            }
+            """
+        )
+        _project_soft_shadow(flow_card, blur=24, y_offset=7)
+
+        layout = QHBoxLayout(flow_card)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(10)
+
+        steps = [
+            ("Video/Image", FluentIcon.PHOTO, SLATE, SLATE_LIGHT),
+            ("Image Processing", FluentIcon.PALETTE, RUST, RUST_LIGHT),
+            ("YOLOv26 Detection", FluentIcon.ROBOT, SAGE, SAGE_LIGHT),
+            ("Vehicle Classification", FluentIcon.CAR, GOLD, GOLD_LIGHT),
+            ("Traffic Analytics", FluentIcon.PIE_SINGLE, RUST, RUST_LIGHT),
+            ("Dashboard & Reports", FluentIcon.SPEED_HIGH, SLATE, SLATE_LIGHT),
+        ]
+        for index, (title, icon, accent, soft) in enumerate(steps):
+            layout.addWidget(ArchitectureStep(title, icon, accent, soft), 1)
+            if index < len(steps) - 1:
+                arrow = BodyLabel("→")
+                arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                arrow.setStyleSheet(
+                    f"font-size: 24px; font-weight: 800; color: {TEXT_FAINT};"
+                )
+                layout.addWidget(arrow)
+
+        return flow_card
 
     def update_summary(self, summary: DetectionSummary, model_name: str) -> None:
         self.cards["total"].set_value(summary.total)

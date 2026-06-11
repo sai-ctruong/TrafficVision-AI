@@ -226,7 +226,6 @@ class Sidebar(QFrame):
                 [
                     ("analytics", "Analytics", FluentIcon.PIE_SINGLE),
                     ("history", "History", FluentIcon.HISTORY),
-                    ("project_information", "Project Information", FluentIcon.INFO),
                 ],
             ),
         ]
