@@ -7,7 +7,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from ..models.detection import DetectionBox, DetectionSummary, VEHICLE_CLASSES
+from ..models.detection import DetectionBox, DetectionMode, DetectionSummary, SahiSettings, VEHICLE_CLASSES
+from .sahi_detector import SahiVehicleDetector
 
 
 CLASS_ALIASES = {
@@ -31,6 +32,9 @@ class VehicleDetectionService:
         self.model_name = Path(model_path).name
         self.device: int | str = "cpu"
         self.imgsz = 640
+        self.detection_mode = DetectionMode.YOLO
+        self.sahi_settings = SahiSettings()
+        self._sahi_detector: SahiVehicleDetector | None = None
 
     @property
     def is_loaded(self) -> bool:
@@ -48,7 +52,27 @@ class VehicleDetectionService:
         self.device = self._preferred_device()
         self.model = YOLO(self.model_path)
         self.model_name = Path(self.model_path).name
+        self._sahi_detector = None
         self.reset_inference_state()
+
+    def set_detection_mode(self, mode: DetectionMode | str) -> None:
+        """Switch between standard YOLO and YOLO + SAHI inference."""
+        self.detection_mode = mode if isinstance(mode, DetectionMode) else DetectionMode(mode)
+
+    def configure_sahi(
+        self,
+        slice_width: int,
+        slice_height: int,
+        overlap_width_ratio: float,
+        overlap_height_ratio: float,
+    ) -> None:
+        """Update sliced inference settings used by SAHI mode."""
+        self.sahi_settings = SahiSettings(
+            slice_width=max(64, int(slice_width)),
+            slice_height=max(64, int(slice_height)),
+            overlap_width_ratio=max(0.0, min(0.9, float(overlap_width_ratio))),
+            overlap_height_ratio=max(0.0, min(0.9, float(overlap_height_ratio))),
+        )
 
     def detect(
         self,
@@ -61,6 +85,13 @@ class VehicleDetectionService:
             raise RuntimeError("Model is not loaded")
 
         self.reset_inference_state()
+        if self.detection_mode is DetectionMode.SAHI:
+            summary = self._detect_with_sahi(image, image_name, confidence_threshold)
+            annotated = image.copy()
+            for detection in summary.detections:
+                self._draw_box(annotated, detection.label, detection.confidence, detection.bbox)
+            return annotated, summary
+
         started = time.perf_counter()
         results = self.model(
             image,
@@ -98,8 +129,28 @@ class VehicleDetectionService:
             average_confidence=float(np.mean(confidences)) if confidences else 0.0,
             processing_time=elapsed,
             detections=detections,
+            detection_mode=DetectionMode.YOLO,
         )
         return annotated, summary
+
+    def _detect_with_sahi(
+        self,
+        image: np.ndarray,
+        image_name: str,
+        confidence_threshold: float,
+    ) -> DetectionSummary:
+        if self._sahi_detector is None or self._sahi_detector.model_path != self.model_path:
+            self._sahi_detector = SahiVehicleDetector(self.model_path, self.device)
+        return self._sahi_detector.detect(
+            image,
+            image_name,
+            confidence_threshold,
+            self.sahi_settings,
+        )
+
+    def detections_as_payload(self, summary: DetectionSummary) -> list[dict[str, object]]:
+        """Return detections in the SAHI-requested dictionary format."""
+        return [detection.as_dict() for detection in summary.detections]
 
     def track(
         self,

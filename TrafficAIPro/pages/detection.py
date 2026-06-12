@@ -6,11 +6,11 @@ import hashlib
 
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QGridLayout
-from qfluentwidgets import FluentIcon, InfoBar, InfoBarPosition
+from PyQt6.QtWidgets import QGridLayout, QHBoxLayout, QLabel
+from qfluentwidgets import CheckBox, FluentIcon, InfoBar, InfoBarPosition
 
 from ..database.history_repository import HistoryRepository
-from ..models.detection import DetectionSummary, VEHICLE_CLASSES
+from ..models.detection import DetectionMode, DetectionSummary, VEHICLE_CLASSES
 from .base import Page
 from ..services.detection_service import VehicleDetectionService
 from ..services.settings_service import SettingsService
@@ -55,6 +55,7 @@ class VehicleDetectionPage(Page):
 
         self.result_view = ImageViewer("Detection Result")
         self.layout.addWidget(self.result_view, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._build_sahi_controls()
 
         grid = QGridLayout()
         grid.setSpacing(14)
@@ -69,6 +70,21 @@ class VehicleDetectionPage(Page):
             grid.addWidget(card, 0, index)
         self.layout.addLayout(grid)
         self.layout.addStretch(1)
+
+    def _build_sahi_controls(self) -> None:
+        row = QHBoxLayout()
+        row.setSpacing(10)
+
+        self.sahi_check = CheckBox("Enable SAHI")
+        self.sahi_check.stateChanged.connect(self._queue_mode_redetection)
+        row.addWidget(self.sahi_check)
+
+        self.mode_label = QLabel("Current Detection Mode: YOLO")
+        self.mode_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #4A3B35;")
+        row.addWidget(self.mode_label)
+
+        row.addStretch(1)
+        self.layout.addLayout(row)
 
     def set_image(self, image: np.ndarray, image_name: str) -> None:
         signature = self._image_signature(image, image_name)
@@ -88,8 +104,9 @@ class VehicleDetectionPage(Page):
         if not self.detection_service.is_loaded:
             self.model_status_changed.emit("Model not loaded")
             return
+        self._apply_detection_mode()
         self.model_status_changed.emit("Processing image...")
-        self.result_view.status_label.setText("Running YOLO detection...")
+        self.result_view.status_label.setText(f"Running {self.detection_service.detection_mode.display_name} detection...")
         try:
             annotated, summary = self.detection_service.detect(
                 self.current_image,
@@ -115,5 +132,23 @@ class VehicleDetectionPage(Page):
         digest = hashlib.blake2b(digest_size=16)
         digest.update(image_name.encode("utf-8", errors="ignore"))
         digest.update(str(contiguous.shape).encode("ascii"))
+        digest.update(self._settings_signature().encode("ascii"))
         digest.update(contiguous.data)
         return digest.hexdigest()
+
+    def _apply_detection_mode(self) -> None:
+        mode = DetectionMode.SAHI if self.sahi_check.isChecked() else DetectionMode.YOLO
+        self.detection_service.set_detection_mode(mode)
+        self.detection_service.configure_sahi(320, 320, 0.2, 0.2)
+        self.mode_label.setText(f"Current Detection Mode: {mode.display_name}")
+
+    def _settings_signature(self) -> str:
+        return "SAHI" if self.sahi_check.isChecked() else "YOLO"
+
+    def _queue_mode_redetection(self, *_args: object) -> None:
+        self._apply_detection_mode()
+        if self.current_image is None:
+            return
+        self._pending_signature = self._image_signature(self.current_image, self.current_name)
+        self.result_view.status_label.setText("Detection settings changed; waiting for automatic detection...")
+        self._auto_detect_timer.start()

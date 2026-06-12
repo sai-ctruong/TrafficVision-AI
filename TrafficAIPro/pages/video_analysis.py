@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 )
 from qfluentwidgets import BodyLabel, CardWidget, CheckBox, FluentIcon, IconWidget, InfoBar, InfoBarPosition, PrimaryPushButton, PushButton
 
-from ..models.detection import DetectionSummary, VEHICLE_CLASSES
+from ..models.detection import DetectionMode, DetectionSummary, VEHICLE_CLASSES
 from ..services.detection_service import VehicleDetectionService
 from ..services.image_service import ImageEnhancementService
 from ..services.settings_service import SettingsService
@@ -220,8 +220,6 @@ class VideoAnalysisPage(Page):
         row2.addWidget(self._lbl("IOU"))
         row2.addWidget(self.iou_spin)
 
-        row2.addWidget(self._vdiv())
-
         self.line_orientation = QComboBox()
         self.line_orientation.addItems(["Horizontal", "Vertical"])
         self.line_orientation.setFixedWidth(118)
@@ -312,10 +310,13 @@ class VideoAnalysisPage(Page):
         # but compact enough that the whole page fits one viewport.
         for view in (self.original_view, self.detection_view):
             view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            view.setMaximumWidth(500)
+            view.image_label.setMinimumSize(260, 260)
+            view.image_label.setMaximumSize(420, 420)
             view.image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        grid.addWidget(self.original_view, 0, 0, Qt.AlignmentFlag.AlignHCenter)
-        grid.addWidget(self.detection_view, 0, 1, Qt.AlignmentFlag.AlignHCenter)
+        grid.addWidget(self.original_view, 0, 0)
+        grid.addWidget(self.detection_view, 0, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         grid.setRowStretch(0, 1)
@@ -521,6 +522,7 @@ class VideoAnalysisPage(Page):
 
         if self.detection_service.is_loaded and should_run_inference:
             try:
+                self._force_yolo_mode()
                 if self.tracking_check.isChecked():
                     annotated, tracks, processing_time = self.detection_service.track(
                         yolo_input,
@@ -565,6 +567,7 @@ class VideoAnalysisPage(Page):
         self.progress.setValue(self.frame_index)
 
     def _reset_tracking_state(self, *_args: object) -> None:
+        self._force_yolo_mode()
         self.tracked_ids = {name: set() for name in VEHICLE_CLASSES}
         self.previous_centers.clear()
         self.track_labels.clear()
@@ -574,6 +577,9 @@ class VideoAnalysisPage(Page):
         self.last_average_confidence = 0.0
         self.detection_service.reset_tracking()
         self._update_analytics(0.0, 0.0, 0.0)
+
+    def _force_yolo_mode(self) -> None:
+        self.detection_service.set_detection_mode(DetectionMode.YOLO)
 
     def _line_orientation_changed(self, *_args: object) -> None:
         self.line_initialized = False
@@ -613,17 +619,22 @@ class VideoAnalysisPage(Page):
             cv2.putText(image, "Counting Line", (min(width - 210, position + 10), 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2, cv2.LINE_AA)
 
     def _update_analytics(self, fps: float, processing_time: float, average_confidence: float) -> None:
-        total_unique = sum(len(ids) for ids in self.tracked_ids.values())
-        self.stat_labels["total"].setText(str(total_unique))
+        if not self.tracking_check.isChecked():
+            totals = self.last_summary.counts
+            total_display = self.last_summary.total
+        else:
+            totals = {label: len(self.tracked_ids[label]) for label in VEHICLE_CLASSES}
+            total_display = sum(totals.values())
+        self.stat_labels["total"].setText(str(total_display))
         for label in VEHICLE_CLASSES:
-            self.stat_labels[label].setText(str(len(self.tracked_ids[label])))
+            self.stat_labels[label].setText(str(totals.get(label, 0)))
         self.stat_labels["frame"].setText(f"{self.frame_index}/{self.total_frames or '-'}")
         self.stat_labels["fps"].setText(f"{fps:.1f}")
         self.stat_labels["time"].setText(f"{processing_time * 1000:.0f} ms")
         self.stat_labels["confidence"].setText(f"{average_confidence:.1%}")
-        mode = "tracking" if self.tracking_check.isChecked() else "detection only"
+        workflow = "tracking" if self.tracking_check.isChecked() else "detection only"
         self.status_label.setText(
-            f"YOLO26 runs on {'enhanced' if self.enhance_check.isChecked() else 'original'} RGB frames. "
-            f"Mode: {mode}. GPU: {self.detection_service.device}. ImgSz: {self.detection_service.imgsz}. "
+            f"YOLO runs on {'enhanced' if self.enhance_check.isChecked() else 'original'} RGB frames. "
+            f"Mode: {workflow}. GPU: {self.detection_service.device}. ImgSz: {self.detection_service.imgsz}. "
             f"Inference: every {INFERENCE_FRAME_INTERVAL} frames."
         )

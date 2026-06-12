@@ -49,6 +49,8 @@ class HistoryRepository:
                 """
             )
             self._ensure_column(connection, "result_image_path", "TEXT")
+            self._ensure_column(connection, "detection_mode", "TEXT NOT NULL DEFAULT 'YOLO'")
+            self._ensure_column(connection, "inference_time", "REAL NOT NULL DEFAULT 0")
 
     def _ensure_column(self, connection: sqlite3.Connection, name: str, definition: str) -> None:
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(detections)")}
@@ -62,8 +64,9 @@ class HistoryRepository:
                 """
                 INSERT INTO detections (
                     image_name, detection_date, car_count, bus_count, truck_count,
-                    van_count, total_vehicles, average_confidence, processing_time, result_image_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    van_count, total_vehicles, average_confidence, processing_time,
+                    result_image_path, detection_mode, inference_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     summary.image_name or "Untitled image",
@@ -76,6 +79,8 @@ class HistoryRepository:
                     summary.average_confidence,
                     summary.processing_time,
                     result_image_path,
+                    summary.detection_mode.value,
+                    summary.processing_time,
                 ),
             )
 
@@ -127,6 +132,8 @@ class HistoryRepository:
                     "Total Vehicles",
                     "Average Confidence",
                     "Processing Time",
+                    "Detection Mode",
+                    "Inference Time",
                     "Result Image Path",
                 ]
             )
@@ -142,6 +149,8 @@ class HistoryRepository:
                         row["total_vehicles"],
                         f"{row['average_confidence']:.4f}",
                         f"{row['processing_time']:.4f}",
+                        row["detection_mode"] if "detection_mode" in row.keys() else "YOLO",
+                        f"{row['inference_time']:.4f}" if "inference_time" in row.keys() else f"{row['processing_time']:.4f}",
                         row["result_image_path"] if "result_image_path" in row.keys() else "",
                     ]
                 )

@@ -282,6 +282,7 @@ class DashboardPage(Page):
         self.view.enable_video_background(video_candidates)
         self.view.depth_blobs = True
         self.view.update()
+        self._mode_summaries: dict[str, DetectionSummary] = {}
 
         self._add_project_information()
         self.layout.addWidget(ProjectSectionTitle("Dashboard", "Detection Dashboard"))
@@ -371,6 +372,15 @@ class DashboardPage(Page):
         _apply_glass(self.hardware, accent=SAGE, blur=28)
         right.addWidget(self.hardware)
 
+        self.comparison = InfoCard(
+            "Standard YOLO vs SAHI",
+            "Run both modes on traffic media to compare detections.",
+            FluentIcon.SPEED_HIGH,
+            RUST,
+        )
+        _apply_glass(self.comparison, accent=RUST, blur=28)
+        right.addWidget(self.comparison)
+
         upload_hint = UploadHintCard()
         _apply_glass_frame(upload_hint, blur=24)
         right.addWidget(upload_hint)
@@ -443,6 +453,7 @@ class DashboardPage(Page):
         return flow_card
 
     def update_summary(self, summary: DetectionSummary, model_name: str) -> None:
+        self._mode_summaries[summary.detection_mode.value] = summary
         self.cards["total"].set_value(summary.total)
         for key in VEHICLE_CLASSES:
             self.cards[key].set_value(summary.counts.get(key, 0))
@@ -458,7 +469,17 @@ class DashboardPage(Page):
             f"Processing time {summary.processing_time:.2f}s  ·  "
             f"Average confidence {summary.average_confidence:.0%}"
         )
-        self.model.body_label.setText(f"Active model: {model_name}")
+        self.performance.body_label.setText(
+            f"Detection Mode: {summary.detection_mode.display_name}\n"
+            f"Inference Time: {summary.processing_time:.2f}s  -  Avg FPS: {summary.fps:.1f}\n"
+            f"Average confidence {summary.average_confidence:.0%}"
+        )
+        self.model.body_label.setText(
+            f"Model Status: Loaded\n"
+            f"Active model: {model_name}\n"
+            f"Total Detections: {len(summary.detections)}  -  Vehicle Count: {summary.total}"
+        )
+        self._update_detection_comparison()
 
     def update_hardware_status(self, mode: str, traffic_light: str, last_sent_data: str) -> None:
         """Update optional Arduino integration status."""
@@ -476,4 +497,25 @@ class DashboardPage(Page):
             f"Arduino Mode: {mode}\n"
             f"Traffic Light: {traffic_light}\n"
             f"Last Sent Data: {last_sent_data}"
+        )
+
+    def _update_detection_comparison(self) -> None:
+        yolo = self._mode_summaries.get("YOLO")
+        sahi = self._mode_summaries.get("SAHI")
+        if yolo is None or sahi is None:
+            latest = next(reversed(self._mode_summaries.values()), None)
+            latest_mode = latest.detection_mode.display_name if latest else "YOLO"
+            self.comparison.body_label.setText(
+                f"Latest mode: {latest_mode}\n"
+                "Run the other mode to populate comparison metrics."
+            )
+            return
+
+        vehicle_delta = sahi.total - yolo.total
+        detection_delta = len(sahi.detections) - len(yolo.detections)
+        time_delta = sahi.processing_time - yolo.processing_time
+        self.comparison.body_label.setText(
+            f"Vehicle Count Difference: {vehicle_delta:+d}\n"
+            f"Inference Time Difference: {time_delta:+.2f}s\n"
+            f"Detection Difference: {detection_delta:+d}"
         )

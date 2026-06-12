@@ -41,9 +41,21 @@ class HistoryPage(Page):
         self.layout.addLayout(toolbar)
 
         self.table = TableWidget()
-        self.table.setColumnCount(9)
+        self.table.setColumnCount(11)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Image Name", "Date", "Cars", "Buses", "Trucks", "Vans", "Total", "Avg Confidence"]
+            [
+                "ID",
+                "Image Name",
+                "Date",
+                "Mode",
+                "Cars",
+                "Buses",
+                "Trucks",
+                "Vans",
+                "Total",
+                "Avg Confidence",
+                "Inference",
+            ]
         )
         self.table.verticalHeader().hide()
         self.table.setAlternatingRowColors(True)
@@ -72,12 +84,14 @@ class HistoryPage(Page):
                 row["id"],
                 row["image_name"],
                 row["detection_date"],
+                row["detection_mode"] if "detection_mode" in row.keys() else "YOLO",
                 row["car_count"],
                 row["bus_count"],
                 row["truck_count"],
                 row["van_count"],
                 row["total_vehicles"],
                 f"{row['average_confidence']:.0%}",
+                f"{row['inference_time']:.2f}s" if "inference_time" in row.keys() else f"{row['processing_time']:.2f}s",
             ]
             for col, value in enumerate(values):
                 self.table.setItem(row_index, col, QTableWidgetItem(str(value)))
