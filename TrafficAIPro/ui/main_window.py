@@ -86,6 +86,7 @@ class TrafficAIWindow(QMainWindow):
             self.image_service,
             self.detection_service,
             self.settings_service,
+            self.arduino_service,
         )
         self.analytics = AnalyticsPage()
         self.history = HistoryPage(self.history_repository)
@@ -130,6 +131,7 @@ class TrafficAIWindow(QMainWindow):
         self.processing.image_changed.connect(self.detection.set_image)
         self.detection.detection_completed.connect(self._handle_detection_complete)
         self.detection.model_status_changed.connect(self._update_model_status)
+        self.video.hardware_status_changed.connect(self._update_hardware_status)
 
     def show_page(self, key: str) -> None:
         """Switch to specified page."""

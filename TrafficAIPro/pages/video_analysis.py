@@ -7,7 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
     QComboBox,
@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 from qfluentwidgets import BodyLabel, CardWidget, CheckBox, FluentIcon, IconWidget, InfoBar, InfoBarPosition, PrimaryPushButton, PushButton
 
 from ..models.detection import DetectionMode, DetectionSummary, VEHICLE_CLASSES
+from ..services.arduino_service import ArduinoService
 from ..services.detection_service import VehicleDetectionService
 from ..services.image_service import ImageEnhancementService
 from ..services.settings_service import SettingsService
@@ -63,11 +64,14 @@ INFERENCE_FRAME_INTERVAL = 2
 class VideoAnalysisPage(Page):
     """Run YOLO26 on RGB frames, track vehicles, and count line crossings."""
 
+    hardware_status_changed = pyqtSignal()
+
     def __init__(
         self,
         image_service: ImageEnhancementService,
         detection_service: VehicleDetectionService,
         settings: SettingsService,
+        arduino_service: ArduinoService,
     ) -> None:
         super().__init__("Video Analysis", "VideoAnalysisPage")
         # Tighter page rhythm so the toolbar + stats + 2 videos fit
@@ -77,6 +81,7 @@ class VideoAnalysisPage(Page):
         self.image_service = image_service
         self.detection_service = detection_service
         self.settings = settings
+        self.arduino_service = arduino_service
         self.capture: cv2.VideoCapture | None = None
         self.video_path = ""
         self.frame_index = 0
@@ -564,6 +569,7 @@ class VideoAnalysisPage(Page):
             self._draw_counting_line(annotated)
         self.detection_view.set_image(annotated, "Detection + tracking overlay")
         self._update_analytics(fps, processing_time, average_confidence)
+        self._send_video_counts_to_arduino()
         self.progress.setValue(self.frame_index)
 
     def _reset_tracking_state(self, *_args: object) -> None:
@@ -580,6 +586,32 @@ class VideoAnalysisPage(Page):
 
     def _force_yolo_mode(self) -> None:
         self.detection_service.set_detection_mode(DetectionMode.YOLO)
+
+    def _send_video_counts_to_arduino(self) -> None:
+        """Send video vehicle counts to Arduino at a throttled frame interval."""
+        if self.frame_index <= 0 or self.frame_index % 10 != 0:
+            return
+
+        counts = self._current_vehicle_counts()
+        try:
+            self.arduino_service.send_vehicle_count(
+                counts.get("car", 0),
+                counts.get("bus", 0),
+                counts.get("truck", 0),
+                counts.get("van", 0),
+            )
+        except Exception as exc:
+            print(f"[ArduinoService] Video count send skipped: {exc}")
+        finally:
+            self.hardware_status_changed.emit()
+
+    def _current_vehicle_counts(self) -> dict[str, int]:
+        if not self.tracking_check.isChecked():
+            return {
+                label: self.last_summary.counts.get(label, 0)
+                for label in VEHICLE_CLASSES
+            }
+        return {label: len(self.tracked_ids[label]) for label in VEHICLE_CLASSES}
 
     def _line_orientation_changed(self, *_args: object) -> None:
         self.line_initialized = False
